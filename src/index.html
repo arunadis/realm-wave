@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Realm Weave</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Macondo&family=Manrope:wght@500;700;800&display=swap" rel="stylesheet" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --void-0: #060912;
+      --void-1: #0f1b2f;
+      --void-2: #16243d;
+      --mist: #d7e9ff;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 18% 18%, rgba(79, 143, 215, 0.24), transparent 42%),
+        radial-gradient(circle at 82% 22%, rgba(140, 193, 176, 0.22), transparent 46%),
+        radial-gradient(circle at 50% 84%, rgba(88, 110, 190, 0.24), transparent 54%),
+        linear-gradient(145deg, var(--void-0) 0%, var(--void-1) 50%, var(--void-2) 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Manrope', sans-serif;
+    }
+    canvas {
+      display: block;
+      max-width: 100vw;
+      max-height: 100vh;
+      touch-action: none;
+      border-radius: 14px;
+      border: 1px solid rgba(194, 220, 255, 0.18);
+      box-shadow:
+        0 28px 54px rgba(2, 8, 18, 0.62),
+        0 0 0 1px rgba(115, 175, 238, 0.12) inset,
+        0 0 36px rgba(91, 145, 207, 0.25);
+    }
+    @media (max-width: 640px) {
+      canvas {
+        border-radius: 0;
+        border: none;
+        box-shadow: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="gameCanvas"></canvas>
+  <script type="module" src="main.js"></script>
+</body>
+</html>
