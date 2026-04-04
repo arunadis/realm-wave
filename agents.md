@@ -12,6 +12,8 @@ Comprehensive codebase reference for AI agents working on Realm Weave, a 7-stage
 **Entry Point**: `src/index.html` → loads `src/main.js` (module). Fonts: 'Cinzel', 'Macondo', 'Manrope'
 **Dev Server**: `npm run dev` → `http://localhost:5173`
 **Build**: `npm run build` → outputs to `dist/`
+**Deploy**: GitHub Actions auto-deploys to GitHub Pages on push to `main` → `https://arunadis.github.io/realm-wave/`
+**Vite Base Path**: Conditional — `/realm-wave/` when `GITHUB_ACTIONS` env var is set, `/` otherwise (see `vite.config.js`)
 
 ### Core Game Loop
 
@@ -50,11 +52,17 @@ src/
 ├── state.js        — Central gameState object, all game actions (placement, hold, catalyst, rotate, discard), mode transitions, persistence, serialization
 ├── grid.js         — Grid data structure, tile creation, placement, merge resolution (chain detection), wall durability break logic, game-over checks
 ├── ring.js         — Circular tile queue: create, pop, rotate, hold swap, tech/cursed injection, weighted tier spawning
-├── stages.js       — 10 stage configs (era, gridSize, target, hazards, mechanics, star limits)
+├── stages.js       — 7 stage configs (era, gridSize, target, hazards, mechanics, star limits)
 ├── hazards.js      — Hazard tile creation, flood/raid/pollution/earthquake resolution, pollution tick, hazard spawning, wall spawning
 ├── upgrades.js     — 5 meta-upgrade definitions, purchase logic, effect lookups
 ├── renderer.js     — All Canvas drawing: background, HUD, ring, grid, tiles, overlays, menus, hit-testing helpers
 ├── audio.js        — Web Audio API SFX manager with mute persistence
+
+.github/
+└── workflows/
+    └── deploy.yml  — GitHub Actions: build & deploy to GitHub Pages on push to main
+
+vite.config.js      — Vite config: root=src, conditional base path for GitHub Pages
 ```
 
 ### Dependency Graph
@@ -486,6 +494,16 @@ Artifacts saved under `output/` (screenshots as `shot-N.png`, state as `state-N.
 npm run build    # Vite production build → dist/
 npm run dev      # Vite dev server on port 5173
 ```
+
+### CI/CD — GitHub Pages
+
+A GitHub Actions workflow (`.github/workflows/deploy.yml`) runs on every push to `main`:
+1. Checks out code
+2. Installs deps (`npm ci`)
+3. Builds (`npm run build`) — `GITHUB_ACTIONS` env var sets Vite `base` to `/realm-wave/`
+4. Uploads `dist/` artifact and deploys to GitHub Pages
+
+Requires GitHub repo **Settings → Pages → Source** set to **GitHub Actions**.
 
 ---
 

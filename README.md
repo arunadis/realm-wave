@@ -2,9 +2,12 @@
 
 A 7-stage hybrid puzzle-strategy HTML5 Canvas game built with vanilla JavaScript and HTML5 Canvas. Guide a civilization from tribal beginnings to a technological singularity by placing and merging tiles on a grid while surviving hazards, managing resources, and chaining combos.
 
+**Live Demo**: [https://arunadis.github.io/realm-wave/](https://arunadis.github.io/realm-wave/)
+
 ## Table of Contents
 
 - [Getting Started](#getting-started)
+- [Deployment](#deployment)
 - [How to Play](#how-to-play)
 - [Stages](#stages)
 - [Tile Hierarchy](#tile-hierarchy)
@@ -53,6 +56,16 @@ The optimized output is written to the `dist/` directory.
 ```bash
 npm run preview
 ```
+
+---
+
+## Deployment
+
+The project includes a GitHub Actions workflow (`.github/workflows/deploy.yml`) that automatically builds and deploys to **GitHub Pages** on every push to `main`.
+
+- The Vite `base` path is set conditionally — `/realm-wave/` in CI, `/` locally — so assets resolve correctly in both environments.
+- To enable, go to your GitHub repo **Settings → Pages** and set **Source** to **GitHub Actions**.
+- The live site will be available at: **https://arunadis.github.io/realm-wave/**
 
 ---
 
@@ -191,6 +204,7 @@ src/
 - **Fonts**: Cinzel, Macondo, Manrope (Google Fonts)
 - **Persistence**: `localStorage`
 - **Testing**: [Playwright](https://playwright.dev/) (browser automation hooks exposed on `window`)
+- **CI/CD**: GitHub Actions → GitHub Pages
 
 ---
 
