@@ -293,6 +293,8 @@ The largest file. Handles all Canvas 2D rendering and UI interaction geometry.
 
 **Layout constants**: `HUD_HEIGHT = 70`, `RING_AREA_HEIGHT = 90`, `GRID_PADDING = 20`, `CELL_GAP = 4`.
 
+**Responsive layout metrics**: `getLayoutMetrics(w, h)` adds compact-mode scaling for mobile/small canvases (reduced HUD/ring/padding/top-control sizes). `getRingLayout(w, h, state)` centralizes ring/slot sizing so draw + hit-tests stay aligned.
+
 **Main render entry**: `renderFrame(ctx, w, h, state, getGridLayout)` — dispatches to mode-specific draw functions.
 
 **Drawing functions**:
@@ -360,6 +362,12 @@ Mute persisted in `localStorage` under `realmWeaveMuted`.
 ### `index.html` — HTML Shell (~58 lines)
 
 Minimal HTML: centered `<canvas id="gameCanvas">`, Google Fonts (Cinzel serif for titles, Manrope sans-serif for UI), dark gradient background CSS, responsive mobile styles (no border-radius on small screens), `touch-action: none`.
+
+### Mobile Responsiveness Notes
+
+- Gameplay and menu/overlay layouts use compact metrics on narrow/short screens to prevent overlap.
+- Compact mode reduces HUD/ring height, ring slot size, top control size, and selected typography/button dimensions.
+- `state.js#getGridLayout()` now imports and uses `renderer.js#getLayoutMetrics()` so click/touch hitboxes match rendered compact geometry.
 
 ---
 
@@ -590,9 +598,9 @@ Each phase detail doc contains: planned design, actual implementation, deviation
 |-----------------------|---------------|-------------|
 | `BASE_WIDTH`          | `main.js`     | 800         |
 | `BASE_HEIGHT`         | `main.js`     | 900         |
-| `HUD_HEIGHT`          | `renderer.js` | 70          |
-| `RING_AREA_HEIGHT`    | `renderer.js` | 90          |
-| `GRID_PADDING`        | `renderer.js` | 20          |
+| `HUD_HEIGHT`          | `renderer.js` | 70 base (50 compact) |
+| `RING_AREA_HEIGHT`    | `renderer.js` | 90 base (68 compact) |
+| `GRID_PADDING`        | `renderer.js` | 20 base (12 compact) |
 | `CELL_GAP`            | `renderer.js` | 4           |
 | `RING_SLOT_COUNT`     | `state.js`    | 6 (default) |
 | `MAX_TIER`            | `grid.js`     | 5 (capital) |

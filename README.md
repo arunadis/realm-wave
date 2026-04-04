@@ -177,6 +177,15 @@ Stars earned from stage clears are spent on permanent upgrades in the **Upgrade 
 
 **Touch controls:** Tap to place tiles. Horizontal swipe (≥38 px) to rotate the ring.
 
+## Mobile Layout
+
+The canvas UI now uses a compact responsive layout for narrow/short screens to prevent overlap across gameplay and menus.
+
+- On compact mobile viewports, HUD/ring heights and grid padding are reduced so the grid remains visible and interactive.
+- Ring slots, top-control buttons, and text sizes scale down in compact mode.
+- Title, stage-select, guide, stats, upgrade shop, pause, stage-clear, and game-over layouts use smaller sizing to avoid clipping.
+- Click/touch hit-testing stays aligned with visuals because `state.js` grid geometry now uses the same responsive metrics as `renderer.js`.
+
 ---
 
 ## Project Structure

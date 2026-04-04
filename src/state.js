@@ -13,7 +13,7 @@ import {
 
 import {
   renderFrame,
-  HUD_HEIGHT, RING_AREA_HEIGHT, GRID_PADDING,
+  getLayoutMetrics,
 } from './renderer.js';
 
 import { STAGES, getStage, computeStars } from './stages.js';
@@ -927,9 +927,10 @@ function maybeSetContextHint() {
 
 export function getGridLayout(canvasW, canvasH) {
   const gridSize = gameState.gridSize;
-  const availW = canvasW - GRID_PADDING * 2;
-  const topOffset = HUD_HEIGHT + RING_AREA_HEIGHT;
-  const availH = canvasH - topOffset - GRID_PADDING * 2;
+  const metrics = getLayoutMetrics(canvasW, canvasH);
+  const availW = canvasW - metrics.gridPadding * 2;
+  const topOffset = metrics.hudHeight + metrics.ringAreaHeight;
+  const availH = canvasH - topOffset - metrics.gridPadding * 2;
   const cellSize = Math.floor(Math.min(availW, availH) / gridSize);
   const gridW = cellSize * gridSize;
   const gridH = cellSize * gridSize;

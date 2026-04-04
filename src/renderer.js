@@ -11,6 +11,9 @@ export const HUD_HEIGHT = 70;
 export const RING_AREA_HEIGHT = 90;
 export const GRID_PADDING = 20;
 export const CELL_GAP = 4;
+const COMPACT_BREAKPOINT_H = 620;
+const COMPACT_BREAKPOINT_W = 420;
+const VERY_COMPACT_BREAKPOINT_H = 520;
 
 const ERA_NAMES = [
   '', 'Dawn', 'Iron', 'Classical',
@@ -83,6 +86,53 @@ const TOP_CTRL_GAP = 8;
 const UI_TITLE_FONT = '"Macondo", "Cinzel", "Georgia", serif';
 const UI_FONT = '"Manrope", "Segoe UI", sans-serif';
 const STAR_COLOR = '#f6d48e';
+
+export function getLayoutMetrics(w, h) {
+  const compact = h < COMPACT_BREAKPOINT_H || w < COMPACT_BREAKPOINT_W;
+  const veryCompact = h < VERY_COMPACT_BREAKPOINT_H;
+  return {
+    compact,
+    veryCompact,
+    hudHeight: compact ? 50 : HUD_HEIGHT,
+    ringAreaHeight: compact ? 68 : RING_AREA_HEIGHT,
+    gridPadding: compact ? 12 : GRID_PADDING,
+    topControlSize: compact ? 32 : TOP_CTRL_SIZE,
+    topControlGap: compact ? 4 : TOP_CTRL_GAP,
+  };
+}
+
+function getRingLayout(w, h, state) {
+  const metrics = getLayoutMetrics(w, h);
+  const ringY = metrics.hudHeight + 2;
+  const compact = metrics.compact;
+  const slotSize = compact ? 32 : 40;
+  const slotGap = compact ? 4 : 5;
+  const holdSize = compact ? 32 : 40;
+  const currentSize = compact ? 40 : 48;
+  const gapBetween = compact ? 8 : 12;
+  const ringTiles = getRingTiles(state.ring);
+  const ringCount = ringTiles.length;
+  const foresightLevel = Number(state.upgradeLevels?.foresight) || 0;
+  const previewCount = Math.max(1, Math.min(ringCount, 3 + foresightLevel));
+  const totalRingW = previewCount * (slotSize + slotGap) - slotGap;
+  const totalW = holdSize + gapBetween + currentSize + gapBetween + totalRingW;
+  const startX = Math.floor((w - totalW) / 2);
+  return {
+    metrics,
+    ringY,
+    compact,
+    slotSize,
+    slotGap,
+    holdSize,
+    currentSize,
+    gapBetween,
+    ringTiles,
+    previewCount,
+    totalRingW,
+    totalW,
+    startX,
+  };
+}
 
 let accessibilityVisuals = {
   colorBlindMode: false,
@@ -272,6 +322,7 @@ export function getStatsActionAt(px, py, w, h) {
 }
 
 function drawStatsScreen(ctx, w, h, state) {
+  const compact = h < COMPACT_BREAKPOINT_H || w < COMPACT_BREAKPOINT_W;
   const { panelX, panelY, panelW, panelH, backX, backY, backW, backH } = getStatsLayout(w, h);
   const bestOverall = Math.max(0, ...Object.values(state.bestScores || {}).map(v => Number(v) || 0));
   const rows = [
@@ -299,30 +350,32 @@ function drawStatsScreen(ctx, w, h, state) {
   ctx.stroke();
 
   ctx.fillStyle = '#f4ecff';
-  ctx.font = `700 28px ${UI_TITLE_FONT}`;
+  ctx.font = `700 ${compact ? 24 : 28}px ${UI_TITLE_FONT}`;
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
   ctx.fillText('Statistics', panelX + 20, panelY + 34);
 
-  let y = panelY + 78;
+  const rowH = compact ? 36 : 42;
+  const rowGap = compact ? 44 : 50;
+  let y = panelY + (compact ? 68 : 78);
   for (const [label, value] of rows) {
     ctx.fillStyle = 'rgba(48, 40, 76, 0.9)';
-    roundRect(ctx, panelX + 20, y, panelW - 40, 42, 8);
+    roundRect(ctx, panelX + 20, y, panelW - 40, rowH, 8);
     ctx.fill();
     ctx.strokeStyle = 'rgba(174, 149, 222, 0.7)';
     ctx.lineWidth = 1;
-    roundRect(ctx, panelX + 20, y, panelW - 40, 42, 8);
+    roundRect(ctx, panelX + 20, y, panelW - 40, rowH, 8);
     ctx.stroke();
 
     ctx.fillStyle = '#d5c6ef';
-    ctx.font = `600 13px ${UI_FONT}`;
+    ctx.font = `600 ${compact ? 11 : 13}px ${UI_FONT}`;
     ctx.textAlign = 'left';
-    ctx.fillText(label, panelX + 34, y + 21);
+    ctx.fillText(label, panelX + 34, y + rowH / 2);
     ctx.fillStyle = '#fff0c9';
-    ctx.font = `700 14px ${UI_FONT}`;
+    ctx.font = `700 ${compact ? 13 : 14}px ${UI_FONT}`;
     ctx.textAlign = 'right';
-    ctx.fillText(value, panelX + panelW - 34, y + 21);
-    y += 50;
+    ctx.fillText(value, panelX + panelW - 34, y + rowH / 2);
+    y += rowGap;
   }
 
   ctx.fillStyle = 'rgba(52, 44, 82, 0.92)';
@@ -338,23 +391,24 @@ function drawStatsScreen(ctx, w, h, state) {
   ctx.textBaseline = 'middle';
   ctx.fillText('Back [Esc]', backX + backW / 2, backY + backH / 2);
 
-  drawTopControls(ctx, w, state);
+  drawTopControls(ctx, w, h, state);
 }
 
-function getTopControlRects(w, state) {
+function getTopControlRects(w, h, state) {
+  const { topControlSize, topControlGap, compact } = getLayoutMetrics(w, h);
   const y = 8;
-  const fullscreen = { x: w - 10 - TOP_CTRL_SIZE, y, w: TOP_CTRL_SIZE, h: TOP_CTRL_SIZE };
-  const mute = { x: fullscreen.x - TOP_CTRL_GAP - TOP_CTRL_SIZE, y, w: TOP_CTRL_SIZE, h: TOP_CTRL_SIZE };
-  const colorBlind = { x: mute.x - TOP_CTRL_GAP - TOP_CTRL_SIZE, y, w: TOP_CTRL_SIZE, h: TOP_CTRL_SIZE };
-  const motion = { x: colorBlind.x - TOP_CTRL_GAP - TOP_CTRL_SIZE, y, w: TOP_CTRL_SIZE, h: TOP_CTRL_SIZE };
+  const fullscreen = { x: w - 10 - topControlSize, y, w: topControlSize, h: topControlSize };
+  const mute = { x: fullscreen.x - topControlGap - topControlSize, y, w: topControlSize, h: topControlSize };
+  const colorBlind = { x: mute.x - topControlGap - topControlSize, y, w: topControlSize, h: topControlSize };
+  const motion = { x: colorBlind.x - topControlGap - topControlSize, y, w: topControlSize, h: topControlSize };
   const pause = (state.mode === 'playing' || state.mode === 'paused')
-    ? { x: motion.x - TOP_CTRL_GAP - TOP_CTRL_SIZE, y, w: TOP_CTRL_SIZE, h: TOP_CTRL_SIZE }
+    ? { x: motion.x - topControlGap - topControlSize, y, w: topControlSize, h: topControlSize }
     : null;
-  return { mute, fullscreen, colorBlind, motion, pause };
+  return { mute, fullscreen, colorBlind, motion, pause, compact };
 }
 
-export function getTopControlActionAt(px, py, w, _h, state) {
-  const rects = getTopControlRects(w, state);
+export function getTopControlActionAt(px, py, w, h, state) {
+  const rects = getTopControlRects(w, h, state);
   if (inRect(px, py, rects.mute)) return { type: 'mute' };
   if (inRect(px, py, rects.fullscreen)) return { type: 'fullscreen' };
   if (inRect(px, py, rects.colorBlind)) return { type: 'colorBlind' };
@@ -381,8 +435,8 @@ export function getTutorialActionAt(px, py, w, h, state) {
   return null;
 }
 
-function drawTopControls(ctx, w, state) {
-  const rects = getTopControlRects(w, state);
+function drawTopControls(ctx, w, h, state) {
+  const rects = getTopControlRects(w, h, state);
   const buttons = [
     { rect: rects.mute, label: state.audioMuted ? '🔇' : '🔊' },
     { rect: rects.fullscreen, label: state.fullscreenActive ? '🗗' : '⛶' },
@@ -408,7 +462,7 @@ function drawTopControls(ctx, w, state) {
     ctx.shadowColor = 'rgba(150, 210, 255, 0.35)';
     ctx.shadowBlur = 8;
     ctx.fillStyle = '#e7f4ff';
-    ctx.font = `700 ${btn.label.length > 2 ? 11 : 14}px ${UI_FONT}`;
+    ctx.font = `700 ${btn.label.length > 2 ? (rects.compact ? 9 : 11) : (rects.compact ? 12 : 14)}px ${UI_FONT}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(btn.label, btn.rect.x + btn.rect.w / 2, btn.rect.y + btn.rect.h / 2);
@@ -485,6 +539,7 @@ function drawHint(ctx, _w, _h, layout, hint) {
 }
 
 function getTutorialStepConfig(state, layout) {
+  const { hudHeight, ringAreaHeight } = getLayoutMetrics(layout.gridW, layout.originY + layout.gridH);
   const step = state.tutorialStep;
   if (step === 1) {
     return {
@@ -516,9 +571,9 @@ function getTutorialStepConfig(state, layout) {
       text: 'Press Q/E (or swipe) to rotate your upcoming tiles.',
       focus: {
         x: layout.originX - 22,
-        y: HUD_HEIGHT + 6,
+        y: hudHeight + 6,
         w: layout.gridW + 44,
-        h: RING_AREA_HEIGHT - 2,
+        h: ringAreaHeight - 2,
       },
     };
   }
@@ -529,12 +584,13 @@ function getTutorialStepConfig(state, layout) {
       x: 10,
       y: 6,
       w: Math.max(120, layout.originX + layout.gridW + 20),
-      h: HUD_HEIGHT - 8,
+      h: hudHeight - 8,
     },
   };
 }
 
 function drawTutorialOverlay(ctx, w, h, state, layout) {
+  const compact = h < COMPACT_BREAKPOINT_H || w < COMPACT_BREAKPOINT_W;
   const step = getTutorialStepConfig(state, layout);
   const focus = step.focus;
 
@@ -576,7 +632,7 @@ function drawTutorialOverlay(ctx, w, h, state, layout) {
   ctx.fillText(step.title, panelX + 16, panelY + 14);
 
   ctx.fillStyle = '#bfd8ee';
-  ctx.font = `600 13px ${UI_FONT}`;
+  ctx.font = `600 ${compact ? 11 : 13}px ${UI_FONT}`;
   ctx.fillText(step.text, panelX + 16, panelY + 48);
 
   const skip = getTutorialSkipRect(w, h);
@@ -595,15 +651,21 @@ function drawTutorialOverlay(ctx, w, h, state, layout) {
 }
 
 function getTitleButtonLayout(w, h) {
-  const bw = Math.min(260, w - 64);
-  const bh = 50;
+  const compact = h < COMPACT_BREAKPOINT_H || w < COMPACT_BREAKPOINT_W;
+  const bw = Math.min(compact ? 240 : 260, w - 52);
+  const bh = compact ? 42 : 50;
+  const gap = compact ? 8 : 12;
   const x = Math.floor((w - bw) / 2);
-  const playY = Math.floor(h * 0.45);
-  const upgradeY = playY + bh + 12;
-  const statsY = upgradeY + bh + 12;
-  const dailyY = statsY + bh + 12;
-  const guideY = dailyY + bh + 12;
+  const titleSpace = compact ? Math.floor(h * 0.32) : Math.floor(h * 0.44);
+  const totalButtonsH = bh * 5 + gap * 4;
+  const maxTop = Math.max(108, h - totalButtonsH - 28);
+  const playY = Math.min(titleSpace, maxTop);
+  const upgradeY = playY + bh + gap;
+  const statsY = upgradeY + bh + gap;
+  const dailyY = statsY + bh + gap;
+  const guideY = dailyY + bh + gap;
   return {
+    compact,
     play: { x, y: playY, w: bw, h: bh },
     upgrades: { x, y: upgradeY, w: bw, h: bh },
     stats: { x, y: statsY, w: bw, h: bh },
@@ -623,6 +685,7 @@ export function getTitleActionAt(px, py, w, h) {
 }
 
 function drawTitleScreen(ctx, w, h, state) {
+  const compact = h < COMPACT_BREAKPOINT_H || w < COMPACT_BREAKPOINT_W;
   const frame = Number(state.frameCount || 0);
 
   // Dynamic magical glow behind title
@@ -642,27 +705,27 @@ function drawTitleScreen(ctx, w, h, state) {
   titleGrad.addColorStop(1, '#a6c8ff');
   
   ctx.fillStyle = titleGrad;
-  ctx.font = `700 68px ${UI_TITLE_FONT}`;
+  ctx.font = `700 ${compact ? 44 : 68}px ${UI_TITLE_FONT}`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   
   // Outer deep magical glow
   ctx.shadowColor = 'rgba(70, 130, 255, 0.6)';
   ctx.shadowBlur = 24;
-  ctx.fillText('Realm Weave', w / 2, h * 0.24);
+  ctx.fillText('Realm Weave', w / 2, compact ? h * 0.18 : h * 0.24);
   
   // Inner crisp bright glow
   ctx.shadowColor = 'rgba(255, 255, 255, 0.4)';
   ctx.shadowBlur = 8;
-  ctx.fillText('Realm Weave', w / 2, h * 0.24);
+  ctx.fillText('Realm Weave', w / 2, compact ? h * 0.18 : h * 0.24);
   ctx.shadowBlur = 0;
 
   // Subtitle with faint glow
   ctx.shadowColor = 'rgba(180, 210, 255, 0.3)';
   ctx.shadowBlur = 6;
   ctx.fillStyle = '#c8e0ff';
-  ctx.font = `600 16px ${UI_FONT}`;
-  ctx.fillText('Forge your civilization through the ages', w / 2, h * 0.31);
+  ctx.font = `600 ${compact ? 12 : 16}px ${UI_FONT}`;
+  ctx.fillText('Forge your civilization through the ages', w / 2, compact ? h * 0.24 : h * 0.31);
   ctx.shadowBlur = 0;
 
   const btn = getTitleButtonLayout(w, h);
@@ -690,7 +753,7 @@ function drawTitleScreen(ctx, w, h, state) {
     ctx.stroke();
     
     ctx.fillStyle = '#e9f4ff';
-    ctx.font = `700 19px ${UI_FONT}`;
+    ctx.font = `700 ${compact ? 16 : 19}px ${UI_FONT}`;
     ctx.fillText(label, r.x + r.w / 2, r.y + r.h / 2);
   };
 
@@ -701,17 +764,18 @@ function drawTitleScreen(ctx, w, h, state) {
   drawBtn(btn.guide, 'How to Play [G]', '#84bff0');
 
   ctx.fillStyle = '#95abc6';
-  ctx.font = `600 12px ${UI_FONT}`;
-  ctx.fillText('Tap or click to begin', w / 2, btn.guide.y + btn.guide.h + 18);
+  ctx.font = `600 ${compact ? 11 : 12}px ${UI_FONT}`;
+  ctx.fillText('Tap or click to begin', w / 2, btn.guide.y + btn.guide.h + (compact ? 12 : 18));
 
   if (state.mode !== 'paused') {
-    drawTopControls(ctx, w, state);
+    drawTopControls(ctx, w, h, state);
   }
 }
 
 function getPauseOverlayLayout(w, h) {
+  const compact = h < COMPACT_BREAKPOINT_H || w < COMPACT_BREAKPOINT_W;
   const pw = Math.min(340, w - 36);
-  const ph = 260; // Increased height for 3 buttons
+  const ph = compact ? 236 : 260;
   const x = Math.floor((w - pw) / 2);
   const y = Math.floor((h - ph) / 2);
   const bw = pw - 40;
@@ -774,12 +838,13 @@ function drawPauseOverlay(ctx, w, h, state) {
   drawBtn(layout.resume, 'Resume [Esc]', '#6fb2df');
   drawBtn(layout.stageSelect, 'Stage Select', '#f0c877');
   drawBtn(layout.quit, 'Quit to Main Menu', '#ff8888');
-  drawTopControls(ctx, w, state);
+  drawTopControls(ctx, w, h, state);
 }
 
 function getGuideLayout(w, h) {
+  const compact = h < COMPACT_BREAKPOINT_H || w < COMPACT_BREAKPOINT_W;
   const panelW = Math.min(680, w - 36);
-  const panelH = Math.min(760, h - 38);
+  const panelH = Math.min(compact ? 700 : 760, h - 38);
   const panelX = Math.floor((w - panelW) / 2);
   const panelY = Math.floor((h - panelH) / 2);
   const backW = 160;
@@ -798,6 +863,7 @@ export function getGuideActionAt(px, py, w, h) {
 }
 
 function drawGuideScreen(ctx, w, h, state) {
+  const compact = h < COMPACT_BREAKPOINT_H || w < COMPACT_BREAKPOINT_W;
   const { panelX, panelY, panelW, panelH, backX, backY, backW, backH } = getGuideLayout(w, h);
 
   ctx.fillStyle = 'rgba(5, 8, 14, 0.56)';
@@ -815,7 +881,7 @@ function drawGuideScreen(ctx, w, h, state) {
   ctx.stroke();
 
   ctx.fillStyle = '#f0f7ff';
-  ctx.font = `700 30px ${UI_TITLE_FONT}`;
+  ctx.font = `700 ${compact ? 24 : 30}px ${UI_TITLE_FONT}`;
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
   ctx.fillText('How to Play', panelX + 24, panelY + 22);
@@ -863,15 +929,15 @@ function drawGuideScreen(ctx, w, h, state) {
   let y = panelY + 104;
   for (const section of sections) {
     ctx.fillStyle = '#dff0ff';
-    ctx.font = `700 17px ${UI_TITLE_FONT}`;
+    ctx.font = `700 ${compact ? 15 : 17}px ${UI_TITLE_FONT}`;
     ctx.fillText(section.title, panelX + 24, y);
     y += 26;
 
     ctx.fillStyle = '#c0d6ec';
-    ctx.font = `600 13px ${UI_FONT}`;
+    ctx.font = `600 ${compact ? 11 : 13}px ${UI_FONT}`;
     for (const line of section.lines) {
       ctx.fillText(line, panelX + 30, y);
-      y += 22;
+      y += compact ? 18 : 22;
     }
     y += 8;
   }
@@ -889,7 +955,7 @@ function drawGuideScreen(ctx, w, h, state) {
   ctx.textBaseline = 'middle';
   ctx.fillText('Back [Esc]', backX + backW / 2, backY + backH / 2);
 
-  drawTopControls(ctx, w, state);
+  drawTopControls(ctx, w, h, state);
 }
 
 // --- Master render ---
@@ -994,11 +1060,12 @@ export function renderFrame(ctx, w, h, state, getGridLayout) {
 }
 
 function getUpgradeShopLayout(w, h) {
+  const compact = h < COMPACT_BREAKPOINT_H || w < COMPACT_BREAKPOINT_W;
   const panelW = Math.min(600, w - 40);
   const panelH = Math.min(620, h - 36);
   const panelX = Math.floor((w - panelW) / 2);
   const panelY = Math.floor((h - panelH) / 2);
-  const rowH = 88;
+  const rowH = compact ? 72 : 88;
   const listX = panelX + 18;
   const listY = panelY + 88;
   const listW = panelW - 36;
@@ -1030,6 +1097,7 @@ export function getUpgradeShopActionAt(px, py, w, h, state) {
 }
 
 function drawUpgradeShop(ctx, w, h, state) {
+  const compact = h < COMPACT_BREAKPOINT_H || w < COMPACT_BREAKPOINT_W;
   const layout = getUpgradeShopLayout(w, h);
   const { panelX, panelY, panelW, panelH, listX, listY, listW, rowH, backX, backY, backW, backH } = layout;
 
@@ -1095,36 +1163,36 @@ function drawUpgradeShop(ctx, w, h, state) {
     }
 
     ctx.fillStyle = '#edf7ff';
-    ctx.font = `700 15px ${UI_TITLE_FONT}`;
+    ctx.font = `700 ${compact ? 13 : 15}px ${UI_TITLE_FONT}`;
     ctx.textAlign = 'left';
     ctx.fillText(def.name, listX + 14, y + 22);
 
     ctx.fillStyle = '#a8c1dd';
-    ctx.font = `600 10px ${UI_FONT}`;
+    ctx.font = `600 ${compact ? 9 : 10}px ${UI_FONT}`;
     ctx.fillText(def.description, listX + 14, y + 38);
 
     const preview = getLevelDescription(def.id, level);
     ctx.fillStyle = '#cde8ff';
-    ctx.font = `700 10px ${UI_FONT}`;
+    ctx.font = `700 ${compact ? 9 : 10}px ${UI_FONT}`;
     ctx.fillText(preview, listX + 14, y + 51);
 
     const levelText = `Lvl ${level}/${MAX_UPGRADE_LEVEL}`;
     const levelBar = '★'.repeat(level) + '☆'.repeat(MAX_UPGRADE_LEVEL - level);
     ctx.fillStyle = STAR_COLOR;
-    ctx.font = `700 12px ${UI_FONT}`;
+    ctx.font = `700 ${compact ? 11 : 12}px ${UI_FONT}`;
     ctx.fillText(`${levelText}  ${levelBar}`, listX + 14, y + 65);
 
     ctx.textAlign = 'right';
     if (maxed) {
       ctx.fillStyle = '#8fd19d';
-      ctx.font = `700 13px ${UI_FONT}`;
+      ctx.font = `700 ${compact ? 11 : 13}px ${UI_FONT}`;
       ctx.fillText('MAX', listX + listW - 16, y + 40);
     } else {
       ctx.fillStyle = affordable ? '#b0ffd0' : '#f0c090';
       ctx.font = `700 13px ${UI_FONT}`;
       ctx.fillText(`Cost: ${cost}★`, listX + listW - 16, y + 35);
       ctx.fillStyle = '#9ab2cd';
-      ctx.font = `600 10px ${UI_FONT}`;
+      ctx.font = `600 ${compact ? 9 : 10}px ${UI_FONT}`;
       ctx.fillText(affordable ? 'Click to buy' : 'Not enough stars', listX + listW - 16, y + 54);
     }
   }
@@ -1158,7 +1226,7 @@ function drawUpgradeShop(ctx, w, h, state) {
   ctx.fillText('Back [Esc]', backX + backW / 2, backY + backH / 2);
 
   if (state.mode !== 'paused') {
-    drawTopControls(ctx, w, state);
+    drawTopControls(ctx, w, h, state);
   }
 }
 
@@ -1223,7 +1291,7 @@ function drawBackground(ctx, w, h, state) {
 // --- Stage Select Screen ---
 
 function getStageButtonLayout(w, h) {
-  const compact = h < 750;
+  const compact = h < 750 || w < COMPACT_BREAKPOINT_W;
   const btnW = Math.min(STAGE_BTN_W, w - 40);
   const btnH = compact ? 76 : STAGE_BTN_H;
   const gap = compact ? 8 : STAGE_BTN_GAP;
@@ -1298,6 +1366,7 @@ function drawNavToolbarBtn(ctx, rect, label, accent) {
 
 function drawStageSelect(ctx, w, h, state) {
   const layout = getStageButtonLayout(w, h);
+  const compact = layout.compact;
   const scrollY = state.stageSelectScrollY || 0;
   const frame = Number(state.frameCount || 0);
 
@@ -1520,7 +1589,7 @@ function drawStageSelect(ctx, w, h, state) {
       if (badges.length > 0) {
         let badgeX = textX;
         const badgeY = cardY + layout.btnH - 18;
-        ctx.font = `700 8px ${UI_FONT}`;
+        ctx.font = `700 ${compact ? 7 : 8}px ${UI_FONT}`;
         for (const badge of badges) {
           const bw = ctx.measureText(badge).width + 10;
           ctx.fillStyle = accent + '44';
@@ -1541,7 +1610,7 @@ function drawStageSelect(ctx, w, h, state) {
         roundRect(ctx, cbX, cbY, 56, 16, 4);
         ctx.fill();
         ctx.fillStyle = '#ffe3a1';
-        ctx.font = `700 9px ${UI_FONT}`;
+        ctx.font = `700 ${compact ? 8 : 9}px ${UI_FONT}`;
         ctx.textAlign = 'center';
         ctx.fillText(`🏅 ${completedChallenges.length}`, cbX + 28, cbY + 8);
       }
@@ -1603,35 +1672,32 @@ function drawStageSelect(ctx, w, h, state) {
     ctx.fillText('▼', w / 2, layout.contentBottom - 8);
   }
 
-  drawTopControls(ctx, w, state);
+  drawTopControls(ctx, w, h, state);
 }
 
 // --- HUD ---
 
 function drawHUD(ctx, w, state) {
-  const hudGrad = ctx.createLinearGradient(18, 4, 18, HUD_HEIGHT);
+  const logicalH = Math.max(1, Number(ctx?.canvas?.clientHeight) || 0);
+  const { compact, hudHeight } = getLayoutMetrics(w, logicalH);
+  const hudGrad = ctx.createLinearGradient(18, 4, 18, hudHeight);
   hudGrad.addColorStop(0, 'rgba(13, 26, 42, 0.88)');
   hudGrad.addColorStop(1, 'rgba(8, 18, 30, 0.8)');
   ctx.fillStyle = hudGrad;
-  roundRect(ctx, 10, 6, w - 20, HUD_HEIGHT - 8, 14);
+  roundRect(ctx, 10, 6, w - 20, hudHeight - 8, 14);
   ctx.fill();
   ctx.strokeStyle = 'rgba(125, 172, 220, 0.35)';
   ctx.lineWidth = 1.2;
-  roundRect(ctx, 10, 6, w - 20, HUD_HEIGHT - 8, 14);
+  roundRect(ctx, 10, 6, w - 20, hudHeight - 8, 14);
   ctx.stroke();
-
-  // Title
-  ctx.fillStyle = '#f0f6ff';
-  ctx.font = `700 20px ${UI_TITLE_FONT}`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('Realm Weave', w / 2, 16);
 
   // Era + Stage
   const era = ERA_NAMES[state.stage] || `Stage ${state.stage}`;
   ctx.fillStyle = '#adc9e5';
-  ctx.font = `600 11px ${UI_FONT}`;
-  ctx.fillText(`— ${era} Era —`, w / 2, 34);
+  ctx.font = `600 ${compact ? 10 : 11}px ${UI_FONT}`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(`— ${era} Era —`, w / 2, compact ? 14 : 18);
 
   // Score / Turn / Combo row
   const parts = [];
@@ -1658,23 +1724,27 @@ function drawHUD(ctx, w, state) {
   if (state.scoreBleedActive) {
     const pulse = Math.sin(Date.now() * 0.004) * 0.3 + 0.7; // Pulse between 0.4 and 1.0
     ctx.fillStyle = `rgba(224, 85, 85, ${pulse})`; // Red with pulsing alpha
-    ctx.font = `700 11px ${UI_FONT}`; // Slightly larger when bleeding
+    ctx.font = `700 ${compact ? 10 : 11}px ${UI_FONT}`; // Slightly larger when bleeding
   } else {
     ctx.fillStyle = '#bdd3e8';
-    ctx.font = `700 10px ${UI_FONT}`;
+    ctx.font = `700 ${compact ? 9 : 10}px ${UI_FONT}`;
   }
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(parts.join('  |  '), w / 2, 50);
+  const statY = compact ? 26 : 34;
+  const statText = compact
+    ? parts.filter((_, idx) => idx <= 2 || idx === parts.length - 1).join('  |  ')
+    : parts.join('  |  ');
+  ctx.fillText(statText, w / 2, statY);
 
   // Target progress bar
   if (state.stageConfig) {
     const target = state.stageConfig.target;
     const progress = Math.min(1, state.score / target);
     const barW = Math.min(280, w - 80);
-    const barH = 8;
+    const barH = compact ? 7 : 8;
     const barX = Math.floor((w - barW) / 2);
-    const barY = 58;
+    const barY = compact ? 32 : 58;
 
     // Bar background
     ctx.fillStyle = 'rgba(10, 22, 36, 0.95)';
@@ -1694,7 +1764,7 @@ function drawHUD(ctx, w, state) {
 
     // Target label
     ctx.fillStyle = '#9cb2c8';
-    ctx.font = `700 8px ${UI_FONT}`;
+    ctx.font = `700 ${compact ? 7 : 8}px ${UI_FONT}`;
     ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
     ctx.fillText(`${state.score.toLocaleString()}/${target.toLocaleString()}`, barX + barW, barY - 4); // Moved above bar, right aligned
@@ -1710,7 +1780,7 @@ function drawHUD(ctx, w, state) {
     ctx.fillText(
       `Turn ${state.turn} / ★★★≤${state.stageConfig.turnLimit3Star} / ★★≤${state.stageConfig.turnLimit2Star}`,
       barX,
-      barY + barH + 6 // Moved closer to bar
+      barY + barH + (compact ? 5 : 6) // Moved closer to bar
     );
 
     if (state.stageConfig.hazardFreq > 0) {
@@ -1721,36 +1791,36 @@ function drawHUD(ctx, w, state) {
           ? '#f0cd7f'
           : '#8ad9a2';
       ctx.fillStyle = hazardColor;
-      ctx.font = `700 8px ${UI_FONT}`;
+      ctx.font = `700 ${compact ? 7 : 8}px ${UI_FONT}`;
       ctx.textAlign = 'center';
-      ctx.fillText(`⚠ Hazard in ${turnsUntilHazard}`, w / 2, barY + barH + 6); // Moved down and centered with turn limits
+      ctx.fillText(`⚠ Hazard in ${turnsUntilHazard}`, w / 2, barY + barH + (compact ? 5 : 6)); // Moved down and centered with turn limits
     }
   }
 
-  drawTopControls(ctx, w, state);
+  drawTopControls(ctx, w, logicalH, state);
 }
 
 // --- Ring Area ---
 
 function drawRingArea(ctx, w, h, state) {
-  const ringY = HUD_HEIGHT + 2;
-  const slotSize = 40;
-  const slotGap = 5;
-  const ringTiles = getRingTiles(state.ring);
-  const ringCount = ringTiles.length;
-  const foresightLevel = Number(state.upgradeLevels?.foresight) || 0;
-  const previewCount = Math.max(1, Math.min(ringCount, 3 + foresightLevel));
-  const totalRingW = previewCount * (slotSize + slotGap) - slotGap;
+  const ringLayout = getRingLayout(w, h, state);
+  const {
+    ringY,
+    compact,
+    slotSize,
+    slotGap,
+    ringTiles,
+    previewCount,
+    totalRingW,
+    holdSize,
+    currentSize,
+    gapBetween,
+    totalW,
+    startX,
+  } = ringLayout;
 
-  // Centering: [HOLD] [CURRENT] [--- NEXT queue ---]
-  const holdSize = 40;
-  const currentSize = 48;
-  const gapBetween = 12;
-  const totalW = holdSize + gapBetween + currentSize + gapBetween + totalRingW;
-  const startX = Math.floor((w - totalW) / 2);
-
-  const ringPanelY = ringY + 10;
-  const ringPanelH = 70;
+  const ringPanelY = ringY + (compact ? 8 : 10);
+  const ringPanelH = compact ? 54 : 70;
   ctx.fillStyle = 'rgba(8, 19, 32, 0.58)';
   roundRect(ctx, startX - 12, ringPanelY, totalW + 24, ringPanelH, 12);
   ctx.fill();
@@ -1761,7 +1831,7 @@ function drawRingArea(ctx, w, h, state) {
 
   // --- Hold slot ---
   const holdX = startX;
-  const holdY = ringY + 20;
+  const holdY = ringY + (compact ? 16 : 20);
 
   let holdLabel = 'HOLD';
   if (state.holdUnlocked) {
@@ -1798,7 +1868,7 @@ function drawRingArea(ctx, w, h, state) {
 
   // --- Current tile ---
   const currentX = holdX + holdSize + gapBetween;
-  const currentY = ringY + 16;
+  const currentY = ringY + (compact ? 12 : 16);
 
   drawSlotLabel(ctx, currentX, currentY, currentSize, 'PLACE');
 
@@ -1818,7 +1888,7 @@ function drawRingArea(ctx, w, h, state) {
 
   // --- Discard button ---
   if (state.discardUnlocked) {
-    const discardSize = 24;
+    const discardSize = compact ? 20 : 24;
     const discardX = currentX + currentSize + 4;
     const discardY = currentY + currentSize - discardSize - 4;
     
@@ -1838,7 +1908,7 @@ function drawRingArea(ctx, w, h, state) {
     
     // Discard icon (X)
     ctx.fillStyle = state.discardCount >= 2 ? '#e74c3c' : '#9db4cc';
-    ctx.font = 'bold 14px system-ui';
+    ctx.font = `700 ${compact ? 12 : 14}px ${UI_FONT}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('✕', discardX + discardSize / 2, discardY + discardSize / 2);
@@ -1846,7 +1916,7 @@ function drawRingArea(ctx, w, h, state) {
     // Discard count indicator
     const countY = discardY + discardSize + 4;
     ctx.fillStyle = state.discardCount >= 2 ? '#e74c3c' : '#9db4cc';
-    ctx.font = '700 9px Manrope';
+    ctx.font = `700 ${compact ? 8 : 9}px ${UI_FONT}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
     const countText = state.discardCount === 0 ? 'DISCARD [X]' : 
@@ -1857,7 +1927,7 @@ function drawRingArea(ctx, w, h, state) {
 
   // --- Next queue ---
   const ringStartX = currentX + currentSize + gapBetween;
-  const ringSlotY = ringY + 20;
+  const ringSlotY = ringY + (compact ? 16 : 20);
 
   drawSlotLabel(ctx, ringStartX, ringSlotY, totalRingW, 'NEXT');
 
@@ -1868,7 +1938,7 @@ function drawRingArea(ctx, w, h, state) {
   }
 
   // --- Rotate charges ---
-  const chargesY = ringSlotY + slotSize + 5;
+  const chargesY = ringSlotY + slotSize + (compact ? 3 : 5);
   const ring = state.ring;
   const chargeCount = Math.max(0, Math.floor(ring.rotateCharges || 0));
   const baseMax = Math.max(0, Math.floor(ring.maxRotateCharges || 0));
@@ -1877,7 +1947,7 @@ function drawRingArea(ctx, w, h, state) {
   const filled = '⬤'.repeat(baseFilled) + (bonusCharges > 0 ? `+${bonusCharges}` : '');
   const empty = '○'.repeat(Math.max(0, baseMax - baseFilled));
   ctx.fillStyle = '#9cb4ce';
-  ctx.font = `700 9px ${UI_FONT}`;
+  ctx.font = `700 ${compact ? 8 : 9}px ${UI_FONT}`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
   ctx.fillText(`Rotate [Q/E]  ${filled}${empty}`, ringStartX + totalRingW / 2, chargesY);
@@ -1885,10 +1955,10 @@ function drawRingArea(ctx, w, h, state) {
   if (state.catalystUnlocked) {
     const maxCatalystCharges = 1;
     const catalystCharges = Math.max(0, Math.floor(state.catalystCharges || 0));
-    const catalystY = chargesY + 12;
+    const catalystY = chargesY + (compact ? 10 : 12);
     const catalystLabelColor = catalystCharges > 0 ? '#9fc3e4' : '#6c8098';
     ctx.fillStyle = catalystLabelColor;
-    ctx.font = `700 9px ${UI_FONT}`;
+    ctx.font = `700 ${compact ? 8 : 9}px ${UI_FONT}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
     const catalystText = '●'.repeat(Math.min(catalystCharges, maxCatalystCharges))
@@ -1899,7 +1969,8 @@ function drawRingArea(ctx, w, h, state) {
 
 function drawSlotLabel(ctx, x, y, size, text) {
   ctx.fillStyle = '#95b2cd';
-  ctx.font = `700 9px ${UI_FONT}`;
+  const small = size <= 32;
+  ctx.font = `700 ${small ? 8 : 9}px ${UI_FONT}`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'bottom';
   ctx.fillText(text, x + size / 2, y - 2);
@@ -2525,18 +2596,19 @@ function drawCatalystOverlay(ctx, layout, state) {
 }
 
 function getStageClearLayout(w, h, state) {
+  const compact = h < COMPACT_BREAKPOINT_H || w < COMPACT_BREAKPOINT_W;
   const isVictory = state.stageId === STAGES.length;
   const hasNext = !isVictory;
-  const pw = 340;
-  const ph = isVictory ? 276 : 268;
+  const pw = Math.min(340, w - 24);
+  const ph = compact ? (isVictory ? 248 : 236) : (isVictory ? 276 : 268);
   const px = Math.floor((w - pw) / 2);
   const py = Math.floor((h - ph) / 2);
-  const btnW = hasNext ? 136 : 188;
-  const btnH = 44;
+  const btnW = hasNext ? (compact ? 122 : 136) : (compact ? 164 : 188);
+  const btnH = compact ? 40 : 44;
   const btnY = py + ph - 104;
   const retryX = hasNext ? px + 24 : px + Math.floor((pw - btnW) / 2);
   const nextX = px + pw - btnW - 24;
-  const stageSelectW = 188;
+  const stageSelectW = compact ? 170 : 188;
   const stageSelectH = 30;
   const stageSelectX = px + Math.floor((pw - stageSelectW) / 2);
   const stageSelectY = py + ph - 48;
@@ -2560,12 +2632,13 @@ export function getStageClearActionAt(px, py, w, h, state) {
 }
 
 function getGameOverLayout(w, h) {
-  const pw = 340;
-  const ph = 228;
+  const compact = h < COMPACT_BREAKPOINT_H || w < COMPACT_BREAKPOINT_W;
+  const pw = Math.min(340, w - 24);
+  const ph = compact ? 210 : 228;
   const px = Math.floor((w - pw) / 2);
   const py = Math.floor((h - ph) / 2);
   const btnW = pw - 48;
-  const btnH = 44;
+  const btnH = compact ? 40 : 44;
   const retryY = py + 124;
   const stageSelectY = retryY + btnH + 10;
   return {
@@ -2586,26 +2659,14 @@ export function getGameOverActionAt(px, py, w, h) {
 
 export function getRingAreaActionAt(px, py, w, h, state) {
   if (state.mode !== 'playing' || !state.discardUnlocked) return null;
-  
-  const ringY = HUD_HEIGHT + 2;
-  const holdSize = 40;
-  const currentSize = 48;
-  const gapBetween = 12;
-  const ringTiles = getRingTiles(state.ring);
-  const ringCount = ringTiles.length;
-  const slotSize = 40;
-  const slotGap = 5;
-  const foresightLevel = Number(state.upgradeLevels?.foresight) || 0;
-  const previewCount = Math.max(1, Math.min(ringCount, 3 + foresightLevel));
-  const totalRingW = previewCount * (slotSize + slotGap) - slotGap;
-  const totalW = holdSize + gapBetween + currentSize + gapBetween + totalRingW;
-  const startX = Math.floor((w - totalW) / 2);
-  
+  const ringLayout = getRingLayout(w, h, state);
+  const { ringY, compact, holdSize, currentSize, gapBetween, startX } = ringLayout;
+
   const currentX = startX + holdSize + gapBetween;
-  const currentY = ringY + 16;
-  
+  const currentY = ringY + (compact ? 12 : 16);
+
   // Discard button positioned to the right of current tile
-  const discardSize = 24;
+  const discardSize = compact ? 20 : 24;
   const discardX = currentX + currentSize + 4;
   const discardY = currentY + currentSize - discardSize - 4;
   
