@@ -12,7 +12,7 @@ export const RING_AREA_HEIGHT = 90;
 export const GRID_PADDING = 20;
 export const CELL_GAP = 4;
 const COMPACT_BREAKPOINT_H = 620;
-const COMPACT_BREAKPOINT_W = 420;
+const COMPACT_BREAKPOINT_W = 380;
 const VERY_COMPACT_BREAKPOINT_H = 520;
 
 const ERA_NAMES = [
@@ -52,7 +52,7 @@ const ERA_THEMES = [
 ];
 
 // Stage button layout constants
-const STAGE_BTN_W = 340;
+const STAGE_BTN_W = 320;
 const STAGE_BTN_H = 90;
 const STAGE_BTN_GAP = 12;
 const STAGE_HEADER_H = 68;
@@ -81,8 +81,8 @@ const ERA_CARD_GRAD = [
   ['rgba(14,32,56,0.92)', 'rgba(8,20,40,0.95)'],      // Modern
   ['rgba(30,14,48,0.92)', 'rgba(18,8,34,0.95)'],      // Singularity
 ];
-const TOP_CTRL_SIZE = 40;
-const TOP_CTRL_GAP = 8;
+const TOP_CTRL_SIZE = 36;
+const TOP_CTRL_GAP = 6;
 const UI_TITLE_FONT = '"Macondo", "Cinzel", "Georgia", serif';
 const UI_FONT = '"Manrope", "Segoe UI", sans-serif';
 const STAR_COLOR = '#f6d48e';
@@ -304,7 +304,7 @@ function drawTierPattern(ctx, x, y, size, tier) {
 function getStatsLayout(w, h) {
   const compact = h < COMPACT_BREAKPOINT_H || w < COMPACT_BREAKPOINT_W;
   const edge = compact ? 12 : 20;
-  const panelW = Math.min(560, w - edge * 2);
+  const panelW = Math.min(520, w - edge * 2);
   const panelH = Math.min(520, h - edge * 2);
   const panelX = Math.floor((w - panelW) / 2);
   const panelY = Math.floor((h - panelH) / 2);
@@ -491,7 +491,7 @@ function drawMechanicNotification(ctx, w, _h, notification) {
   const hide = Math.min(1, progress * 2);
   const yOffset = Math.round((1 - reveal * hide) * -52);
 
-  const bw = Math.min(560, w - 36);
+  const bw = Math.min(500, w - 36);
   const bh = 44;
   const bx = Math.floor((w - bw) / 2);
   const by = 10 + yOffset;
@@ -654,7 +654,7 @@ function drawTutorialOverlay(ctx, w, h, state, layout) {
 
 function getTitleButtonLayout(w, h) {
   const compact = h < COMPACT_BREAKPOINT_H || w < COMPACT_BREAKPOINT_W;
-  const bw = Math.min(compact ? 240 : 260, w - 52);
+  const bw = Math.min(compact ? 240 : 260, w - 40);
   const bh = compact ? 42 : 50;
   const gap = compact ? 8 : 12;
   const x = Math.floor((w - bw) / 2);
@@ -845,7 +845,7 @@ function drawPauseOverlay(ctx, w, h, state) {
 
 function getGuideLayout(w, h) {
   const compact = h < COMPACT_BREAKPOINT_H || w < COMPACT_BREAKPOINT_W;
-  const panelW = Math.min(680, w - (compact ? 16 : 36));
+  const panelW = Math.min(540, w - (compact ? 16 : 36));
   const panelH = Math.min(compact ? 700 : 760, h - (compact ? 16 : 38));
   const panelX = Math.floor((w - panelW) / 2);
   const panelY = Math.floor((h - panelH) / 2);
@@ -1063,7 +1063,7 @@ export function renderFrame(ctx, w, h, state, getGridLayout) {
 
 function getUpgradeShopLayout(w, h) {
   const compact = h < COMPACT_BREAKPOINT_H || w < COMPACT_BREAKPOINT_W;
-  const panelW = Math.min(600, w - (compact ? 16 : 40));
+  const panelW = Math.min(520, w - (compact ? 16 : 40));
   const panelH = Math.min(620, h - (compact ? 16 : 36));
   const panelX = Math.floor((w - panelW) / 2);
   const panelY = Math.floor((h - panelH) / 2);
@@ -1294,7 +1294,7 @@ function drawBackground(ctx, w, h, state) {
 
 function getStageButtonLayout(w, h) {
   const compact = h < 750 || w < COMPACT_BREAKPOINT_W;
-  const btnW = Math.min(STAGE_BTN_W, w - (compact ? 16 : 40));
+  const btnW = Math.min(STAGE_BTN_W, w - (compact ? 16 : 24));
   const btnH = compact ? 76 : STAGE_BTN_H;
   const gap = compact ? 8 : STAGE_BTN_GAP;
   const contentTop = compact ? 60 : STAGE_HEADER_H + STAGE_CONTENT_PAD;
@@ -1310,6 +1310,11 @@ function getStageButtonLayout(w, h) {
 export function getStageSelectMaxScroll(w, h) {
   const { maxScroll } = getStageButtonLayout(w, h);
   return maxScroll;
+}
+
+export function getStageSelectScrollInfo(w, h) {
+  const { contentTop, contentBottom, viewH, btnH, gap, maxScroll } = getStageButtonLayout(w, h);
+  return { contentTop, viewH, btnH, gap, maxScroll };
 }
 
 function getNavToolbarLayout(w) {

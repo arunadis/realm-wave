@@ -31,12 +31,13 @@ import {
   getTutorialActionAt,
   getRingAreaActionAt,
   getStageSelectMaxScroll,
+  getStageSelectScrollInfo,
 } from './renderer.js';
 import { createAudioManager } from './audio.js';
 import { UPGRADE_DEFS } from './upgrades.js';
 
-const BASE_WIDTH = 800;
-const BASE_HEIGHT = 900;
+const BASE_WIDTH = 540;
+const BASE_HEIGHT = 960;
 const SWIPE_MIN_DIST = 38;
 
 let canvas, ctx;
@@ -550,15 +551,12 @@ function onKeyDown(e) {
       const { width, height } = getLogicalSize();
       const maxScroll = getStageSelectMaxScroll(width, height);
       if (maxScroll > 0) {
-        const cardH = height < 750 ? 76 : 90;
-        const gap = height < 750 ? 8 : 12;
-        const contentTop = 76;
-        const viewH = height - 6 - contentTop;
-        const cardTop = 8 + idx * (cardH + gap);
-        const cardBot = cardTop + cardH;
+        const info = getStageSelectScrollInfo(width, height);
+        const cardTop = 8 + idx * (info.btnH + info.gap);
+        const cardBot = cardTop + info.btnH;
         const scroll = getStageSelectScroll();
         if (cardTop < scroll) setStageSelectScroll(cardTop, maxScroll);
-        else if (cardBot > scroll + viewH) setStageSelectScroll(cardBot - viewH, maxScroll);
+        else if (cardBot > scroll + info.viewH) setStageSelectScroll(cardBot - info.viewH, maxScroll);
       }
       audio.play('ui');
       return;

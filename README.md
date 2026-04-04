@@ -178,12 +178,13 @@ Stars earned from stage clears are spent on permanent upgrades in the **Upgrade 
 
 **Touch controls:** Tap to place tiles. Horizontal swipe (≥38 px) to rotate the ring.
 
-## Mobile Layout
+## Adaptive Portrait Layout
 
-The canvas UI now uses a compact responsive layout for narrow/short screens to prevent overlap across gameplay and menus.
+The game uses a **9:16 portrait** aspect ratio (540×960 base) for maximum play area on both desktop and mobile.
 
-- On touch mobile viewports, the game canvas now fills the full browser viewport (instead of preserving the desktop 800×900 aspect box).
-- On compact mobile viewports, HUD/ring heights and grid padding are reduced so the grid remains visible and interactive.
+- On desktop, the canvas scales to fit the window while maintaining 9:16 aspect ratio.
+- On touch mobile viewports, the canvas fills the full browser viewport.
+- On compact mobile viewports (narrow/short screens), HUD/ring heights and grid padding are further reduced so the grid remains visible and interactive.
 - Ring slots, top-control buttons, and text sizes scale down in compact mode.
 - Title, stage-select, guide, stats, upgrade shop, pause, stage-clear, and game-over layouts use smaller sizing and tighter edge margins to avoid clipping.
 - Click/touch hit-testing stays aligned with visuals because `state.js` grid geometry now uses the same responsive metrics as `renderer.js`.

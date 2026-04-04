@@ -172,7 +172,7 @@ Also persists `colorBlindMode` and `reducedMotion` preferences.
 
 ### `main.js` — Input & Game Loop (~388 lines)
 
-**Canvas setup**: Base resolution 800×900, responsive scaling via `devicePixelRatio` and viewport fit. CSS logical size tracked separately from physical pixels.
+**Canvas setup**: Base resolution 540×960 (9:16 portrait), responsive scaling via `devicePixelRatio` and viewport fit. On desktop, canvas maintains 9:16 aspect ratio; on mobile touch devices, canvas fills the full viewport. CSS logical size tracked separately from physical pixels.
 
 Desktop-only hover support: `mousemove` updates `hoverCell` and `mouseleave` clears it (skipped on touch-capable devices).
 
@@ -363,13 +363,15 @@ Mute persisted in `localStorage` under `realmWeaveMuted`.
 
 Minimal HTML: centered `<canvas id="gameCanvas">`, Google Fonts (Cinzel serif for titles, Manrope sans-serif for UI), dark gradient background CSS, responsive mobile styles (no border-radius on small screens), `touch-action: none`.
 
-### Mobile Responsiveness Notes
+### Adaptive Portrait Layout & Mobile Responsiveness
 
-- `main.js#resizeCanvas()` uses `visualViewport` when available and, on touch mobile viewports, sizes canvas to full viewport width/height instead of preserving desktop aspect ratio.
-- Gameplay and menu/overlay layouts use compact metrics on narrow/short screens to prevent overlap.
+- Base canvas is 540×960 (9:16 portrait). Desktop scales within this aspect ratio; mobile fills the full viewport via `visualViewport` API.
+- `COMPACT_BREAKPOINT_W` is 380px (triggers compact mode for very narrow screens, not the default 540px width).
+- All overlay panels (guide, stats, shop, pause, stage clear, game over) cap their max-width to fit within 540px.
 - Compact mode reduces HUD/ring height, ring slot size, top control size, and selected typography/button dimensions.
-- Compact mode also reduces edge margins/padding for stats/guide/shop/stage-select/pause/stage-clear/game-over panels so screens fit cleanly on phones.
-- `state.js#getGridLayout()` now imports and uses `renderer.js#getLayoutMetrics()` so click/touch hitboxes match rendered compact geometry.
+- Compact mode also reduces edge margins/padding for overlay panels so screens fit cleanly on phones.
+- `state.js#getGridLayout()` imports and uses `renderer.js#getLayoutMetrics()` so click/touch hitboxes match rendered compact geometry.
+- `main.js` keyboard auto-scroll for stage select uses `getStageSelectScrollInfo()` from renderer instead of hardcoded constants.
 
 ---
 
@@ -599,11 +601,11 @@ Each phase detail doc contains: planned design, actual implementation, deviation
 
 | Constant              | Location       | Value       |
 |-----------------------|---------------|-------------|
-| `BASE_WIDTH`          | `main.js`     | 800         |
-| `BASE_HEIGHT`         | `main.js`     | 900         |
-| `HUD_HEIGHT`          | `renderer.js` | 70 base (50 compact) |
-| `RING_AREA_HEIGHT`    | `renderer.js` | 90 base (68 compact) |
-| `GRID_PADDING`        | `renderer.js` | 20 base (12 compact) |
+| `BASE_WIDTH`          | `main.js`     | 540         |
+| `BASE_HEIGHT`         | `main.js`     | 960         |
+| `HUD_HEIGHT`          | `renderer.js` | 70 base (44 compact) |
+| `RING_AREA_HEIGHT`    | `renderer.js` | 90 base (60 compact) |
+| `GRID_PADDING`        | `renderer.js` | 20 base (8 compact)  |
 | `CELL_GAP`            | `renderer.js` | 4           |
 | `RING_SLOT_COUNT`     | `state.js`    | 6 (default) |
 | `MAX_TIER`            | `grid.js`     | 5 (capital) |
