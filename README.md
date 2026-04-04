@@ -64,6 +64,7 @@ npm run preview
 The project includes a GitHub Actions workflow (`.github/workflows/deploy.yml`) that automatically builds and deploys to **GitHub Pages** on every push to `main`.
 
 - The Vite `base` path is set conditionally — `/realm-wave/` in CI, `/` locally — so assets resolve correctly in both environments.
+- The workflow runs `actions/configure-pages` before uploading the `dist/` artifact to ensure GitHub Pages deployment metadata is configured correctly.
 - To enable, go to your GitHub repo **Settings → Pages** and set **Source** to **GitHub Actions**.
 - The live site will be available at: **https://arunadis.github.io/realm-wave/**
 

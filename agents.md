@@ -511,7 +511,8 @@ A GitHub Actions workflow (`.github/workflows/deploy.yml`) runs on every push to
 1. Checks out code
 2. Installs deps (`npm ci`)
 3. Builds (`npm run build`) — `GITHUB_ACTIONS` env var sets Vite `base` to `/realm-wave/`
-4. Uploads `dist/` artifact and deploys to GitHub Pages
+4. Configures Pages metadata (`actions/configure-pages`)
+5. Uploads `dist/` artifact and deploys to GitHub Pages
 
 Requires GitHub repo **Settings → Pages → Source** set to **GitHub Actions**.
 
