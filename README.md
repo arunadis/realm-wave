@@ -181,9 +181,10 @@ Stars earned from stage clears are spent on permanent upgrades in the **Upgrade 
 
 The canvas UI now uses a compact responsive layout for narrow/short screens to prevent overlap across gameplay and menus.
 
+- On touch mobile viewports, the game canvas now fills the full browser viewport (instead of preserving the desktop 800×900 aspect box).
 - On compact mobile viewports, HUD/ring heights and grid padding are reduced so the grid remains visible and interactive.
 - Ring slots, top-control buttons, and text sizes scale down in compact mode.
-- Title, stage-select, guide, stats, upgrade shop, pause, stage-clear, and game-over layouts use smaller sizing to avoid clipping.
+- Title, stage-select, guide, stats, upgrade shop, pause, stage-clear, and game-over layouts use smaller sizing and tighter edge margins to avoid clipping.
 - Click/touch hit-testing stays aligned with visuals because `state.js` grid geometry now uses the same responsive metrics as `renderer.js`.
 
 ---

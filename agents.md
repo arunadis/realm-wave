@@ -365,8 +365,10 @@ Minimal HTML: centered `<canvas id="gameCanvas">`, Google Fonts (Cinzel serif fo
 
 ### Mobile Responsiveness Notes
 
+- `main.js#resizeCanvas()` uses `visualViewport` when available and, on touch mobile viewports, sizes canvas to full viewport width/height instead of preserving desktop aspect ratio.
 - Gameplay and menu/overlay layouts use compact metrics on narrow/short screens to prevent overlap.
 - Compact mode reduces HUD/ring height, ring slot size, top control size, and selected typography/button dimensions.
+- Compact mode also reduces edge margins/padding for stats/guide/shop/stage-select/pause/stage-clear/game-over panels so screens fit cleanly on phones.
 - `state.js#getGridLayout()` now imports and uses `renderer.js#getLayoutMetrics()` so click/touch hitboxes match rendered compact geometry.
 
 ---

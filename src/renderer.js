@@ -93,11 +93,11 @@ export function getLayoutMetrics(w, h) {
   return {
     compact,
     veryCompact,
-    hudHeight: compact ? 50 : HUD_HEIGHT,
-    ringAreaHeight: compact ? 68 : RING_AREA_HEIGHT,
-    gridPadding: compact ? 12 : GRID_PADDING,
-    topControlSize: compact ? 32 : TOP_CTRL_SIZE,
-    topControlGap: compact ? 4 : TOP_CTRL_GAP,
+    hudHeight: compact ? 44 : HUD_HEIGHT,
+    ringAreaHeight: compact ? 60 : RING_AREA_HEIGHT,
+    gridPadding: compact ? 8 : GRID_PADDING,
+    topControlSize: compact ? 30 : TOP_CTRL_SIZE,
+    topControlGap: compact ? 3 : TOP_CTRL_GAP,
   };
 }
 
@@ -302,14 +302,16 @@ function drawTierPattern(ctx, x, y, size, tier) {
 }
 
 function getStatsLayout(w, h) {
-  const panelW = Math.min(560, w - 40);
-  const panelH = Math.min(520, h - 40);
+  const compact = h < COMPACT_BREAKPOINT_H || w < COMPACT_BREAKPOINT_W;
+  const edge = compact ? 12 : 20;
+  const panelW = Math.min(560, w - edge * 2);
+  const panelH = Math.min(520, h - edge * 2);
   const panelX = Math.floor((w - panelW) / 2);
   const panelY = Math.floor((h - panelH) / 2);
   const backW = 130;
   const backH = 42;
-  const backX = panelX + panelW - backW - 20;
-  const backY = panelY + panelH - backH - 16;
+  const backX = panelX + panelW - backW - (compact ? 12 : 20);
+  const backY = panelY + panelH - backH - (compact ? 12 : 16);
   return { panelX, panelY, panelW, panelH, backX, backY, backW, backH };
 }
 
@@ -658,7 +660,7 @@ function getTitleButtonLayout(w, h) {
   const x = Math.floor((w - bw) / 2);
   const titleSpace = compact ? Math.floor(h * 0.32) : Math.floor(h * 0.44);
   const totalButtonsH = bh * 5 + gap * 4;
-  const maxTop = Math.max(108, h - totalButtonsH - 28);
+  const maxTop = Math.max(compact ? 72 : 108, h - totalButtonsH - (compact ? 16 : 28));
   const playY = Math.min(titleSpace, maxTop);
   const upgradeY = playY + bh + gap;
   const statsY = upgradeY + bh + gap;
@@ -774,7 +776,7 @@ function drawTitleScreen(ctx, w, h, state) {
 
 function getPauseOverlayLayout(w, h) {
   const compact = h < COMPACT_BREAKPOINT_H || w < COMPACT_BREAKPOINT_W;
-  const pw = Math.min(340, w - 36);
+  const pw = Math.min(340, w - (compact ? 16 : 36));
   const ph = compact ? 236 : 260;
   const x = Math.floor((w - pw) / 2);
   const y = Math.floor((h - ph) / 2);
@@ -843,8 +845,8 @@ function drawPauseOverlay(ctx, w, h, state) {
 
 function getGuideLayout(w, h) {
   const compact = h < COMPACT_BREAKPOINT_H || w < COMPACT_BREAKPOINT_W;
-  const panelW = Math.min(680, w - 36);
-  const panelH = Math.min(compact ? 700 : 760, h - 38);
+  const panelW = Math.min(680, w - (compact ? 16 : 36));
+  const panelH = Math.min(compact ? 700 : 760, h - (compact ? 16 : 38));
   const panelX = Math.floor((w - panelW) / 2);
   const panelY = Math.floor((h - panelH) / 2);
   const backW = 160;
@@ -1061,18 +1063,18 @@ export function renderFrame(ctx, w, h, state, getGridLayout) {
 
 function getUpgradeShopLayout(w, h) {
   const compact = h < COMPACT_BREAKPOINT_H || w < COMPACT_BREAKPOINT_W;
-  const panelW = Math.min(600, w - 40);
-  const panelH = Math.min(620, h - 36);
+  const panelW = Math.min(600, w - (compact ? 16 : 40));
+  const panelH = Math.min(620, h - (compact ? 16 : 36));
   const panelX = Math.floor((w - panelW) / 2);
   const panelY = Math.floor((h - panelH) / 2);
   const rowH = compact ? 72 : 88;
-  const listX = panelX + 18;
-  const listY = panelY + 88;
-  const listW = panelW - 36;
+  const listX = panelX + (compact ? 12 : 18);
+  const listY = panelY + (compact ? 74 : 88);
+  const listW = panelW - (compact ? 24 : 36);
   const backW = 130;
   const backH = 42;
-  const backX = panelX + panelW - backW - 20;
-  const backY = panelY + panelH - backH - 16;
+  const backX = panelX + panelW - backW - (compact ? 12 : 20);
+  const backY = panelY + panelH - backH - (compact ? 12 : 16);
   return { panelX, panelY, panelW, panelH, listX, listY, listW, rowH, backX, backY, backW, backH };
 }
 
@@ -1292,11 +1294,11 @@ function drawBackground(ctx, w, h, state) {
 
 function getStageButtonLayout(w, h) {
   const compact = h < 750 || w < COMPACT_BREAKPOINT_W;
-  const btnW = Math.min(STAGE_BTN_W, w - 40);
+  const btnW = Math.min(STAGE_BTN_W, w - (compact ? 16 : 40));
   const btnH = compact ? 76 : STAGE_BTN_H;
   const gap = compact ? 8 : STAGE_BTN_GAP;
-  const contentTop = STAGE_HEADER_H + STAGE_CONTENT_PAD;
-  const contentBottom = h - 6;
+  const contentTop = compact ? 60 : STAGE_HEADER_H + STAGE_CONTENT_PAD;
+  const contentBottom = h - (compact ? 2 : 6);
   const viewH = contentBottom - contentTop;
   const count = STAGES.length;
   const totalContentH = count * (btnH + gap) - gap + 16;
@@ -2599,7 +2601,7 @@ function getStageClearLayout(w, h, state) {
   const compact = h < COMPACT_BREAKPOINT_H || w < COMPACT_BREAKPOINT_W;
   const isVictory = state.stageId === STAGES.length;
   const hasNext = !isVictory;
-  const pw = Math.min(340, w - 24);
+  const pw = Math.min(340, w - (compact ? 12 : 24));
   const ph = compact ? (isVictory ? 248 : 236) : (isVictory ? 276 : 268);
   const px = Math.floor((w - pw) / 2);
   const py = Math.floor((h - ph) / 2);
@@ -2633,7 +2635,7 @@ export function getStageClearActionAt(px, py, w, h, state) {
 
 function getGameOverLayout(w, h) {
   const compact = h < COMPACT_BREAKPOINT_H || w < COMPACT_BREAKPOINT_W;
-  const pw = Math.min(340, w - 24);
+  const pw = Math.min(340, w - (compact ? 12 : 24));
   const ph = compact ? 210 : 228;
   const px = Math.floor((w - pw) / 2);
   const py = Math.floor((h - ph) / 2);

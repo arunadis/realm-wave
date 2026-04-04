@@ -87,11 +87,35 @@ function haptic(pattern) {
   navigator.vibrate(pattern);
 }
 
+function getViewportSize() {
+  const vv = window.visualViewport;
+  if (vv && Number.isFinite(vv.width) && Number.isFinite(vv.height)) {
+    return {
+      width: Math.max(1, Math.floor(vv.width)),
+      height: Math.max(1, Math.floor(vv.height)),
+    };
+  }
+  return {
+    width: Math.max(1, Math.floor(window.innerWidth)),
+    height: Math.max(1, Math.floor(window.innerHeight)),
+  };
+}
+
 function resizeCanvas() {
   const dpr = window.devicePixelRatio || 1;
-  const scale = Math.min(window.innerWidth / BASE_WIDTH, window.innerHeight / BASE_HEIGHT);
-  const maxW = Math.floor(BASE_WIDTH * scale);
-  const maxH = Math.floor(BASE_HEIGHT * scale);
+  const viewport = getViewportSize();
+  const mobileViewport = hasTouch && viewport.width <= 1024;
+
+  let maxW;
+  let maxH;
+  if (mobileViewport) {
+    maxW = viewport.width;
+    maxH = viewport.height;
+  } else {
+    const scale = Math.min(viewport.width / BASE_WIDTH, viewport.height / BASE_HEIGHT);
+    maxW = Math.floor(BASE_WIDTH * scale);
+    maxH = Math.floor(BASE_HEIGHT * scale);
+  }
 
   canvas.style.width = maxW + 'px';
   canvas.style.height = maxH + 'px';
