@@ -2679,22 +2679,29 @@ export function getStageClearActionAt(px, py, w, h, state) {
 function getGameOverLayout(w, h) {
   const compact = h < COMPACT_BREAKPOINT_H || w < COMPACT_BREAKPOINT_W;
   const pw = Math.min(340, w - (compact ? 12 : 24));
-  const ph = compact ? 210 : 228;
+  const ph = compact ? 294 : 322;
   const px = Math.floor((w - pw) / 2);
   const py = Math.floor((h - ph) / 2);
   const btnW = pw - 48;
-  const btnH = compact ? 40 : 44;
-  const retryY = py + 124;
+  const btnH = compact ? 36 : 40;
+  const continueY = py + (compact ? 176 : 194);
+  const retryY = continueY + btnH + 8;
   const stageSelectY = retryY + btnH + 10;
   return {
     panel: { x: px, y: py, w: pw, h: ph },
+    compact,
+    progress: { x: px + 24, y: py + (compact ? 104 : 112), w: btnW, h: compact ? 8 : 10 },
+    continue: { x: px + 24, y: continueY, w: btnW, h: btnH },
     retry: { x: px + 24, y: retryY, w: btnW, h: btnH },
     stageSelect: { x: px + 24, y: stageSelectY, w: btnW, h: btnH },
   };
 }
 
-export function getGameOverActionAt(px, py, w, h) {
+export function getGameOverActionAt(px, py, w, h, state) {
   const layout = getGameOverLayout(w, h);
+  const continueCost = Number(state?.continueCount || 0) > 0 ? 1 : 0;
+  const canContinue = continueCost === 0 || Number(state?.totalStars || 0) >= continueCost;
+  if (canContinue && inRect(px, py, layout.continue)) return { type: 'continue' };
   if (inRect(px, py, layout.retry)) return { type: 'retry' };
   if (inRect(px, py, layout.stageSelect)) return { type: 'stageselect' };
   return null;
@@ -2846,6 +2853,12 @@ function drawStageClear(ctx, w, h, state) {
 // --- Game Over ---
 
 function drawGameOver(ctx, w, h, state) {
+  const transition = state.transition;
+  const fadeIn = transition && transition.to === 'gameover' && transition.duration > 0
+    ? Math.max(0, Math.min(1, 1 - (transition.timer / transition.duration)))
+    : 1;
+  ctx.save();
+  ctx.globalAlpha = fadeIn;
   ctx.fillStyle = 'rgba(4, 8, 14, 0.68)';
   ctx.fillRect(0, 0, w, h);
 
@@ -2872,12 +2885,46 @@ function drawGameOver(ctx, w, h, state) {
   ctx.font = `600 14px ${UI_FONT}`;
   ctx.fillText(`Score: ${state.score.toLocaleString()}`, w / 2, py + 80);
 
-  drawAnimatedStars(ctx, w / 2, py + 108, 0, state.frameCount, 24);
+  const stageKey = String(state.stageId || '');
+  const bestScore = Number(state.bestScores?.[stageKey] || 0);
+  const target = Number(state.stageConfig?.target || 0);
+  const progress = target > 0 ? Math.max(0, Math.min(1, state.score / target)) : 0;
+  const progressPct = Math.round(progress * 100);
 
-  if (state.stageConfig) {
-    ctx.fillStyle = '#97b0c9';
-    ctx.font = `600 11px ${UI_FONT}`;
-    ctx.fillText(`Target was: ${state.stageConfig.target.toLocaleString()}`, w / 2, py + 105);
+  ctx.fillStyle = '#aac4de';
+  ctx.font = `600 11px ${UI_FONT}`;
+  ctx.fillText(`Best: ${bestScore.toLocaleString()}   Target: ${target.toLocaleString()}`, w / 2, py + (layout.compact ? 97 : 102));
+
+  ctx.fillStyle = 'rgba(66, 94, 126, 0.8)';
+  roundRect(ctx, layout.progress.x, layout.progress.y, layout.progress.w, layout.progress.h, 5);
+  ctx.fill();
+  if (progress > 0) {
+    ctx.fillStyle = '#7cc2ff';
+    roundRect(
+      ctx,
+      layout.progress.x,
+      layout.progress.y,
+      Math.max(10, Math.floor(layout.progress.w * progress)),
+      layout.progress.h,
+      5
+    );
+    ctx.fill();
+  }
+  ctx.fillStyle = '#d9ebff';
+  ctx.font = `700 10px ${UI_FONT}`;
+  ctx.fillText(`${progressPct}% of target`, w / 2, layout.progress.y + layout.progress.h + 12);
+
+  drawAnimatedStars(ctx, w / 2, py + (layout.compact ? 144 : 158), 0, state.frameCount, 22);
+
+  const continueCost = Number(state.continueCount || 0) > 0 ? 1 : 0;
+  const canContinue = continueCost === 0 || Number(state.totalStars || 0) >= continueCost;
+  const continueLabel = continueCost === 0 ? 'Continue [C] • Free' : `Continue [C] • ${continueCost}★`;
+  const continueBorder = canContinue ? '#6cd5a8' : '#7f8da0';
+  drawOverlayButton(ctx, layout.continue, continueLabel, continueBorder);
+  if (!canContinue) {
+    ctx.fillStyle = '#9aabbf';
+    ctx.font = `600 10px ${UI_FONT}`;
+    ctx.fillText('Not enough stars to continue', w / 2, layout.continue.y + layout.continue.h + 12);
   }
 
   if (state.dailyChallengeActive) {
@@ -2886,12 +2933,19 @@ function drawGameOver(ctx, w, h, state) {
     ctx.fillText(
       `Daily ${state.dailyDateKey || ''} • Score ${state.score.toLocaleString()} • Best ${Number(state.dailyBestScore || 0).toLocaleString()}`,
       w / 2,
-      py + 120
+      py + (layout.compact ? 168 : 182)
     );
+  }
+
+  if (state.gameOverTip) {
+    ctx.fillStyle = '#bdd6ef';
+    ctx.font = `italic 600 10px ${UI_FONT}`;
+    ctx.fillText(state.gameOverTip, w / 2, layout.panel.y + layout.panel.h - 70);
   }
 
   drawOverlayButton(ctx, layout.retry, 'Retry [R]', '#86b6df');
   drawOverlayButton(ctx, layout.stageSelect, 'Stage Select [Esc]', '#f0c877');
+  ctx.restore();
 }
 
 function drawAnimatedStars(ctx, cx, y, filledCount, frameCount, size) {

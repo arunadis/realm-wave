@@ -43,10 +43,12 @@ npm run dev
 
 The game will be available at **http://localhost:5173**.
 
-### Build for Production
+### Build Verification
 
 ```bash
-npm run build
+npm run build    # Vite production build → dist/
+npm run dev      # Vite dev server on port 5173
+npm run validate:flows -- --url http://localhost:5173/
 ```
 
 The optimized output is written to the `dist/` directory.
@@ -56,6 +58,19 @@ The optimized output is written to the `dist/` directory.
 ```bash
 npm run preview
 ```
+
+### Validate Stage/Continue Flows
+
+With a dev server running, execute the automated flow checks:
+
+```bash
+npm run validate:flows -- --url http://localhost:5173/
+```
+
+This validates:
+- stage-clear `Next Stage` continuity (score/grid/ring/held tile preservation)
+- 5×5 → 6×6 grid expansion behavior
+- game-over continue rules (free first continue, 1★ thereafter, blocked with insufficient stars)
 
 ### Mobile Layout Behavior
 
@@ -85,7 +100,9 @@ The project includes a GitHub Actions workflow (`.github/workflows/deploy.yml`) 
 5. Survive **hazards** (Flood, Raid, Pollution, Earthquake) that periodically disrupt the board.
 6. Reach the **target score** to clear the stage and earn 1–3 stars based on how quickly you finish.
 7. If the grid fills up with no possible merges, it's **game over**.
-8. Spend earned stars on **permanent meta-upgrades** in the Upgrade Shop.
+8. On game over, you can use **Continue** (first time free, then 1★) to remove 3 random tiles and resume.
+9. Clearing a stage and pressing **Next Stage** keeps your run continuity (score, ring, held tile, and grid state).
+10. Spend earned stars on **permanent meta-upgrades** in the Upgrade Shop.
 
 ---
 
@@ -104,6 +121,8 @@ The project includes a GitHub Actions workflow (`.github/workflows/deploy.yml`) 
 Each stage has optional **challenges** that award badges (e.g., Speed Runner, Alchemist, Transcendent).
 
 A **Daily Challenge** mode provides a seeded run on Stage 4 that changes every day.
+
+When advancing with **Next Stage**, run continuity is preserved: score, ring queue state, held tile, and current board carry forward. If a stage expands from 5×5 to 6×6, the existing board is preserved in place and the new edge cells start empty.
 
 ---
 
@@ -147,6 +166,10 @@ A **Daily Challenge** mode provides a seeded run on Stage 4 that changes every d
 | **Catalyst** | `C` | Force-merge a tile on the grid with an adjacent tile |
 | **Discard** | `X` | Discard the current tile (free once; spawns a wall on 2nd+ use) |
 
+**Game Over actions:**
+- **Continue** — first continue is free, later continues cost 1★ and clear 3 random occupied cells.
+- **Retry** — restart the current stage from scratch.
+
 ---
 
 ## Meta Upgrades
@@ -173,7 +196,7 @@ Stars earned from stage clears are spent on permanent upgrades in the **Upgrade 
 | `Q` / `E` | Rotate ring left / right |
 | `H` | Hold tile |
 | `X` | Discard tile |
-| `C` | Catalyst mode |
+| `C` | Catalyst mode (playing) / Continue (game over) |
 | `U` | Open upgrade shop |
 | `S` | Open stats |
 | `G` | Open guide |

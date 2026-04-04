@@ -115,3 +115,9 @@ export function injectCursedTile(ring) {
 export function getRingTiles(ring) {
   return [...ring.slots];
 }
+
+export function updateRingTierWeights(ring, tierWeights) {
+  if (!ring || !Array.isArray(ring.slots)) return false;
+  ring.tierWeights = normalizeTierWeights(tierWeights);
+  return true;
+}

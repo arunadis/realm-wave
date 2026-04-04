@@ -10,6 +10,7 @@ import {
   openGuide, closeGuide,
   openStageSelect, openTitleMenu, togglePause, leavePauseToStageSelect,
   startDailyChallenge,
+  advanceToNextStage, handleContinue,
   toggleColorBlindMode, toggleReducedMotion, setReducedMotion,
   moveSelectedStage, moveSelectedUpgrade,
   skipTutorial,
@@ -323,7 +324,7 @@ function routePointer(px, py) {
       return;
     }
     if (action.type === 'next') {
-      if (startStage(state.stageId + 1)) audio.play('ui');
+      if (advanceToNextStage()) audio.play('ui');
       return;
     }
     if (action.type === 'stageselect') {
@@ -334,8 +335,12 @@ function routePointer(px, py) {
   }
 
   if (state.mode === 'gameover') {
-    const action = getGameOverActionAt(px, py, width, height);
+    const action = getGameOverActionAt(px, py, width, height, state);
     if (!action) return;
+    if (action.type === 'continue') {
+      if (handleContinue()) audio.play('ui');
+      return;
+    }
     if (action.type === 'retry') {
       if (startStage(state.stageId)) audio.play('ui');
       return;
@@ -599,7 +604,7 @@ function onKeyDown(e) {
       return;
     }
     if (key === 'enter') {
-      if (startStage(state.stageId + 1)) audio.play('ui');
+      if (advanceToNextStage()) audio.play('ui');
       return;
     }
     if (key === 'escape') {
@@ -610,6 +615,10 @@ function onKeyDown(e) {
   }
 
   if (state.mode === 'gameover') {
+    if (key === 'c') {
+      if (handleContinue()) audio.play('ui');
+      return;
+    }
     if (key === 'r') {
       if (startStage(state.stageId)) audio.play('ui');
       return;

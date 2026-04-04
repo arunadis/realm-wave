@@ -2,13 +2,13 @@
 
 import {
   createGrid, createTile, placeTile, resolveMerges,
-  isGridFull, hasAnyMerge,
+  isGridFull, hasAnyMerge, expandGrid,
   TIER_NAMES, TIER_COLORS, MAX_TIER,
 } from './grid.js';
 
 import {
   createRing, peekNext, popNext, rotateRing,
-  holdTile as ringHoldTile, getRingTiles, injectTechTile, injectCursedTile,
+  holdTile as ringHoldTile, getRingTiles, injectTechTile, injectCursedTile, updateRingTierWeights,
 } from './ring.js';
 
 import {
@@ -91,6 +91,39 @@ function migrateProgressV1ToV2(progress) {
     highestStageUnlocked: newUnlock,
     saveVersion: CURRENT_SAVE_VERSION,
   };
+}
+
+function getGameOverTip() {
+  let occupied = 0;
+  let lowTierCount = 0;
+  for (let r = 0; r < gameState.gridSize; r++) {
+    for (let c = 0; c < gameState.gridSize; c++) {
+      const tile = gameState.grid[r]?.[c];
+      if (!tile || tile.type === 'hazard' || tile.type === 'wall' || tile.isTech || tile.isCursed) continue;
+      occupied++;
+      if (tile.tier <= 1) lowTierCount++;
+    }
+  }
+  const fillRatio = (gameState.gridSize * gameState.gridSize) > 0
+    ? occupied / (gameState.gridSize * gameState.gridSize)
+    : 0;
+
+  if (gameState.holdUnlocked && gameState.challengeCounters?.holdUses === 0) {
+    return 'Tip: Use Hold [H] to save difficult tiles for later.';
+  }
+  if (gameState.catalystUnlocked && gameState.challengeCounters?.catalystTier4 !== true) {
+    return 'Tip: Catalyst [C] can force-merge adjacent tiles when stuck.';
+  }
+  if ((gameState.challengeCounters?.highestChain || 0) <= 1) {
+    return 'Tip: Build 2+ merge chains to open more space quickly.';
+  }
+  if (gameState.noMergeStreak >= 2) {
+    return 'Tip: Avoid stagnation turns; they can trigger extra hazards.';
+  }
+  if (fillRatio >= 0.75 && lowTierCount >= Math.ceil(occupied * 0.6)) {
+    return 'Tip: Focus on upgrading low-tier clusters before the board fills.';
+  }
+  return 'Tip: Rotate [Q/E] to line up matches before placing risky tiles.';
 }
 
 function createDefaultStats() {
@@ -291,8 +324,10 @@ function createStageSelectState() {
     tutorialPlacementCount: 0,
     mechanicNotification: null,
     hint: null,
+    gameOverTip: null,
     turnsSinceHold: 0,
     turnsSinceCatalyst: 0,
+    continueCount: 0,
     stats: progress.stats,
     completedChallenges: progress.completedChallenges,
     challengeCounters: null,
@@ -438,6 +473,116 @@ export function startDailyChallenge() {
   return true;
 }
 
+export function advanceToNextStage() {
+  if (gameState.mode !== 'stageclear') return false;
+  const nextId = Number(gameState.stageId) + 1;
+  const config = getStage(nextId);
+  if (!config) return false;
+  if (nextId > gameState.highestStageUnlocked) return false;
+
+  const oldSize = Number(gameState.gridSize) || (gameState.grid?.length || config.gridSize);
+  if (config.gridSize > oldSize) {
+    gameState.grid = expandGrid(gameState.grid, config.gridSize);
+  }
+
+  if (gameState.ring) {
+    updateRingTierWeights(gameState.ring, config.tierWeights);
+  }
+
+  setModeWithTransition('playing');
+  gameState.stage = config.id;
+  gameState.stageId = config.id;
+  gameState.stageConfig = config;
+  gameState.gridSize = config.gridSize;
+  gameState.turn = 0;
+  gameState.combo = 0;
+  gameState.stars = 0;
+  gameState.lastMergeEvents = [];
+  gameState.lastHazardEvent = null;
+  gameState.lastPollutionEvent = null;
+  gameState.lastCursedEvent = null;
+  gameState.lastWallEvent = null;
+  gameState.lastWallBreakEvents = [];
+  gameState.lastDecayEvent = null;
+  gameState.discardCount = 0;
+  gameState.scoreBleedActive = false;
+  gameState.lastBleedAmount = 0;
+  gameState.catalystMode = false;
+  gameState.catalystFirst = null;
+  gameState.catalystCharges = config.mechanics.includes('catalyst') ? 1 : 0;
+  gameState.holdUnlocked = config.mechanics.includes('hold');
+  gameState.catalystUnlocked = config.mechanics.includes('catalyst');
+  gameState.comboX3Unlocked = config.mechanics.includes('comboX3');
+  gameState.techTileUnlocked = config.mechanics.includes('techTile');
+  gameState.holdCostsCharge = config.mechanics.includes('holdCostsCharge');
+  gameState.discardUnlocked = config.mechanics.includes('discard');
+  gameState.currentTile = gameState.currentTile || popNext(gameState.ring);
+  gameState.hoverCell = null;
+  gameState.frozenCells = [];
+  gameState.noMergeStreak = 0;
+  gameState.turnsSinceHold = 0;
+  gameState.turnsSinceCatalyst = 0;
+  gameState.continueCount = 0;
+  gameState.gameOverTip = null;
+  gameState.challengeCounters = createChallengeCounters();
+  gameState.hint = null;
+  gameState.dailyChallengeActive = false;
+  gameState.dailyDateKey = null;
+  gameState.dailySeed = null;
+
+  const prevConfig = getStage(config.id - 1);
+  const prevMechanics = prevConfig?.mechanics || [];
+  const newMechanics = (config.mechanics || []).filter(m => !prevMechanics.includes(m));
+  gameState.mechanicNotification = newMechanics.length > 0
+    ? { mechanics: newMechanics, timer: 4, duration: 4 }
+    : null;
+
+  return true;
+}
+
+export function handleContinue() {
+  if (gameState.mode !== 'gameover') return false;
+  if (!gameState.ring) return false;
+
+  const continueCost = gameState.continueCount > 0 ? 1 : 0;
+  if (continueCost > 0 && gameState.totalStars < continueCost) return false;
+
+  if (continueCost > 0) {
+    gameState.totalStars -= continueCost;
+    saveProgressFromState(gameState);
+  }
+
+  const occupiedCells = [];
+  for (let r = 0; r < gameState.gridSize; r++) {
+    for (let c = 0; c < gameState.gridSize; c++) {
+      if (gameState.grid[r][c]) occupiedCells.push({ row: r, col: c });
+    }
+  }
+
+  const rng = gameState.ring.rng || Math.random;
+  const removals = Math.min(3, occupiedCells.length);
+  for (let i = 0; i < removals; i++) {
+    const idx = Math.floor(rng() * occupiedCells.length);
+    const picked = occupiedCells.splice(idx, 1)[0];
+    gameState.grid[picked.row][picked.col] = null;
+  }
+
+  gameState.continueCount += 1;
+  gameState.currentTile = popNext(gameState.ring);
+  gameState.hoverCell = null;
+  gameState.hint = null;
+  gameState.lastHazardEvent = null;
+  gameState.lastPollutionEvent = null;
+  gameState.lastCursedEvent = null;
+  gameState.lastWallEvent = null;
+  gameState.lastWallBreakEvents = [];
+  gameState.lastDecayEvent = null;
+  gameState.gameOverTip = null;
+  gameState.noMergeStreak = 0;
+  setModeWithTransition('playing');
+  return true;
+}
+
 export function startStage(stageId, options = {}) {
   const config = getStage(stageId);
   if (!config) return false;
@@ -489,6 +634,8 @@ export function startStage(stageId, options = {}) {
   gameState.hazardFlash = null;
   gameState.hoverCell = null;
   gameState.noMergeStreak = 0;
+  gameState.continueCount = 0;
+  gameState.gameOverTip = null;
   gameState.tutorialPlacementCount = 0;
   if (stageId === 1 && !gameState.tutorialCompleted) {
     gameState.tutorialStep = 1;
@@ -523,6 +670,7 @@ export function goToStageSelect() {
   gameState.currentTile = null;
   gameState.hoverCell = null;
   gameState.hint = null;
+  gameState.gameOverTip = null;
   gameState.lastUpgradePurchase = null;
   gameState.stageSelectScrollY = 0;
   gameState.selectedStageIndex = Math.max(
@@ -536,6 +684,7 @@ export function openTitleMenu() {
   gameState.currentTile = null;
   gameState.hoverCell = null;
   gameState.hint = null;
+  gameState.gameOverTip = null;
   gameState.lastUpgradePurchase = null;
 }
 
@@ -544,6 +693,7 @@ export function openStageSelect() {
   gameState.currentTile = null;
   gameState.hoverCell = null;
   gameState.hint = null;
+  gameState.gameOverTip = null;
   gameState.lastUpgradePurchase = null;
   gameState.stageSelectScrollY = 0;
   gameState.selectedStageIndex = Math.max(
@@ -753,6 +903,7 @@ function handleStageClear(config) {
   gameState.currentTile = null;
   gameState.hoverCell = null;
   gameState.hint = null;
+  gameState.gameOverTip = null;
 
   if (config.id === 1 && !gameState.tutorialCompleted) {
     gameState.tutorialCompleted = true;
@@ -832,6 +983,7 @@ export function renderGameToText() {
     techTileUnlocked: gameState.techTileUnlocked,
     discardUnlocked: gameState.discardUnlocked,
     discardCount: gameState.discardCount,
+    continueCount: gameState.continueCount,
     scoreBleedActive: gameState.scoreBleedActive,
     lastBleedAmount: gameState.lastBleedAmount,
     audioMuted: gameState.audioMuted,
@@ -861,6 +1013,7 @@ export function renderGameToText() {
     frozenCells: gameState.frozenCells,
     tutorialStep: gameState.tutorialStep,
     mechanicNotification: gameState.mechanicNotification,
+    gameOverTip: gameState.gameOverTip,
   });
 }
 
@@ -1318,6 +1471,7 @@ export function handlePlacement(row, col) {
     gameState.currentTile = null;
     gameState.hoverCell = null;
     gameState.hint = null;
+    gameState.gameOverTip = getGameOverTip();
     updateDailyBest();
   } else {
     // Pop next tile from ring

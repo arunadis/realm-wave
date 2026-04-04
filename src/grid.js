@@ -24,6 +24,18 @@ export function createGrid(size) {
   return grid;
 }
 
+export function expandGrid(grid, newSize) {
+  const oldSize = Array.isArray(grid) ? grid.length : 0;
+  const targetSize = Math.max(oldSize, Math.floor(Number(newSize) || oldSize));
+  const expanded = createGrid(targetSize);
+  for (let r = 0; r < oldSize; r++) {
+    for (let c = 0; c < oldSize; c++) {
+      expanded[r][c] = grid[r][c];
+    }
+  }
+  return expanded;
+}
+
 export function createTile(tier) {
   return {
     tier: Math.min(tier, MAX_TIER),

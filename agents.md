@@ -25,7 +25,7 @@ Comprehensive codebase reference for AI agents working on Realm Weave, a 7-stage
 6. **Stagnation penalty**: consecutive turns without merges auto-spawn hazards (stages 2+)
 7. **Tile decay**: tiles age each turn and downgrade/destroy if left too long (stages 3+)
 8. **Frozen cells**: random empty cells freeze for N turns, blocking placement (stages 2+)
-9. Reach target score → **stage clear** with 1–3 stars; grid full + no merges → **game over**
+9. Reach target score → **stage clear** with 1–3 stars; grid full + no merges → **game over** (with continue option)
 10. Stars are currency for **permanent meta-upgrades**
 
 ### Tile Hierarchy
@@ -133,7 +133,9 @@ The single source of truth. All mutations go through exported functions.
   tutorialStepTimer, tutorialPlacementCount,
   mechanicNotification, // { mechanics[], timer, duration } | null
   hint,              // { text, timer, duration } | null
+  gameOverTip,       // contextual tip shown on game-over overlay
   turnsSinceHold, turnsSinceCatalyst,
+  continueCount,     // continues used this run (first free, then 1★)
   // UI state
   audioMuted, fullscreenActive, shopReturnMode, guideReturnMode, statsReturnMode,
   lastHazardEvent, lastPollutionEvent, lastMergeEvents, lastUpgradePurchase,
@@ -145,10 +147,12 @@ The single source of truth. All mutations go through exported functions.
 - `getState()` / `resetState()` — access/reset state
 - `startStage(stageId, options?)` — initialize a stage run (supports seeded/daily options)
 - `startDailyChallenge()` — start a seeded daily run on stage 4 (`seed = YYYYMMDD`)
+- `advanceToNextStage()` — continue run into next stage while preserving board/ring/score/held tile
 - `handlePlacement(row, col)` — place tile, resolve merges/hazards/combos/cursed decay/wall events, track stagnation streak, spawn hazard on stagnation, tick tile decay, process frozen cell thaw/freeze, check win/lose
 - `handleHold()` — swap current tile with held slot
 - `handleRotate(direction)` — rotate ring queue (-1 or +1)
 - `handleDiscard()` — discard current tile (free first time, spawns wall on 2nd+)
+- `handleContinue()` — continue from game over (first free, later 1★) by clearing 3 random occupied cells
 - `toggleCatalystMode()` / `handleCatalystSelect(row, col)` — catalyst force-merge flow
 - **Score bleed**: After exceeding 3-star turn limit, score drains by `target * scoreBleedRate` each turn (stages 4–7)
 - `openStageSelect()` / `goToStageSelect()` / `openTitleMenu()` — mode navigation
@@ -185,8 +189,8 @@ Desktop-only hover support: `mousemove` updates `hoverCell` and `mouseleave` cle
    - `guide` → Back button
    - `upgradeshop` → Upgrade rows / Back
    - `paused` → Resume / Stage Select / Quit to Main Menu
-   - `stageclear` → Retry / Next Stage / Stage Select actions
-   - `gameover` → Retry / Stage Select actions
+   - `stageclear` → Retry / Next Stage (continuation) / Stage Select actions
+   - `gameover` → Continue / Retry / Stage Select actions
    - `playing` → tutorial skip hit-test, then grid cell click (catalyst mode or normal placement)
 
 Top controls include accessibility toggles: color-blind mode and reduced-motion mode.
@@ -199,7 +203,7 @@ Top controls include accessibility toggles: color-blind mode and reduced-motion 
 - `Q`/`E` — rotate ring left/right (playing)
 - `H` — hold tile (playing)
 - `X` — discard current tile (playing, Stage 2+)
-- `C` — catalyst mode (playing)
+- `C` — catalyst mode (playing) / continue (gameover)
 - `U` — open upgrade shop (title/stageselect)
 - `S` — open stats screen (title/stageselect)
 - `D` — start daily challenge (title)
@@ -221,6 +225,7 @@ Top controls include accessibility toggles: color-blind mode and reduced-motion 
 ### `grid.js` — Grid & Merge Logic (~174 lines)
 
 - `createGrid(size)` → 2D array of `null`
+- `expandGrid(grid, newSize)` → preserves existing tile positions when expanding 5×5 → 6×6
 - `createTile(tier)` → `{ tier, name }`
 - `createTechTile()` → `{ tier: -1, name: 'tech', isTech: true }`
 - `createCursedTile()` → `{ tier: -1, name: 'cursed', isCursed: true }`
@@ -240,6 +245,7 @@ Top controls include accessibility toggles: color-blind mode and reduced-motion 
 - `holdTile(heldTile, currentTile)` — swap logic (returns `{ newCurrent, newHeld }`)
 - `injectTechTile(ring)` — replaces random non-front slot with tech tile
 - `injectCursedTile(ring)` — replaces random non-front slot with cursed tile
+- `updateRingTierWeights(ring, tierWeights)` — updates future spawn distribution without resetting current ring contents
 
 Ring randomness supports seeded PRNG (`mulberry32`) for deterministic daily runs.
 
@@ -332,7 +338,7 @@ The largest file. Handles all Canvas 2D rendering and UI interaction geometry.
 - `getPauseOverlayActionAt(px, py, w, h)` → `{ type: 'resume'|'stageSelect' }`
 - `getTutorialActionAt(px, py, w, h, state)` → `{ type: 'skipTutorial' }`
 - `getStageClearActionAt(px, py, w, h, state)` → `{ type: 'retry'|'next'|'stageselect' }`
-- `getGameOverActionAt(px, py, w, h)` → `{ type: 'retry'|'stageselect' }`
+- `getGameOverActionAt(px, py, w, h, state)` → `{ type: 'continue'|'retry'|'stageselect' }`
 
 **Utility helpers**: `roundRect()`, `lightenHex()`, `darkenHex()`, `hexToRgb()`, `rgbToHex()`, `drawAnimatedStars()`.
 
@@ -401,10 +407,11 @@ paused
 
 stageclear
   ├── Retry / [R] → restart same stage
-  ├── Next Stage / [Enter] → start next stage (1–9)
+  ├── Next Stage / [Enter] → continue run into next stage (preserve score/grid/ring/held)
   └── Stage Select / [Esc] → stageselect
 
 gameover
+  ├── Continue / [C] → first free, later 1★, clear 3 random occupied cells
   ├── Retry / [R] → restart same stage
   └── Stage Select / [Esc] → stageselect
 upgradeshop → Back → (shopReturnMode)
@@ -501,11 +508,23 @@ node develop-web-game/scripts/web_game_playwright_client.js \
 
 Artifacts saved under `output/` (screenshots as `shot-N.png`, state as `state-N.json`).
 
+### Flow Regression Script
+
+```bash
+npm run validate:flows -- --url http://localhost:5173/
+```
+
+This script runs headless Playwright checks for:
+- stage-clear `Next Stage` continuity (`advanceToNextStage`) preserving score/grid/ring/held state
+- 5×5 → 6×6 expansion preserving existing tile coordinates
+- game-over continue policy (`handleContinue`): free first continue, 1★ second continue, blocked when stars are insufficient
+
 ### Build Verification
 
 ```bash
 npm run build    # Vite production build → dist/
 npm run dev      # Vite dev server on port 5173
+npm run validate:flows -- --url http://localhost:5173/
 ```
 
 ### CI/CD — GitHub Pages
