@@ -929,13 +929,13 @@ export function getGridLayout(canvasW, canvasH) {
   const gridSize = gameState.gridSize;
   const metrics = getLayoutMetrics(canvasW, canvasH);
   const availW = canvasW - metrics.gridPadding * 2;
-  const topOffset = metrics.hudHeight + metrics.ringAreaHeight;
+  const topOffset = metrics.topInset + metrics.hudHeight + metrics.ringAreaHeight;
   const availH = canvasH - topOffset - metrics.gridPadding * 2;
   const cellSize = Math.floor(Math.min(availW, availH) / gridSize);
   const gridW = cellSize * gridSize;
   const gridH = cellSize * gridSize;
   const originX = Math.floor((canvasW - gridW) / 2);
-  const originY = topOffset;
+  const originY = topOffset + Math.max(0, Math.floor((availH - gridH) / 2));
   return { originX, originY, cellSize, gridW, gridH, gridSize };
 }
 

@@ -93,9 +93,10 @@ export function getLayoutMetrics(w, h) {
   return {
     compact,
     veryCompact,
-    hudHeight: compact ? 44 : HUD_HEIGHT,
-    ringAreaHeight: compact ? 60 : RING_AREA_HEIGHT,
-    gridPadding: compact ? 8 : GRID_PADDING,
+    topInset: veryCompact ? 10 : compact ? 14 : 8,
+    hudHeight: veryCompact ? 52 : compact ? 56 : HUD_HEIGHT,
+    ringAreaHeight: veryCompact ? 66 : compact ? 72 : RING_AREA_HEIGHT,
+    gridPadding: veryCompact ? 6 : compact ? 10 : GRID_PADDING,
     topControlSize: compact ? 30 : TOP_CTRL_SIZE,
     topControlGap: compact ? 3 : TOP_CTRL_GAP,
   };
@@ -103,7 +104,7 @@ export function getLayoutMetrics(w, h) {
 
 function getRingLayout(w, h, state) {
   const metrics = getLayoutMetrics(w, h);
-  const ringY = metrics.hudHeight + 2;
+  const ringY = metrics.topInset + metrics.hudHeight + 4;
   const compact = metrics.compact;
   const slotSize = compact ? 32 : 40;
   const slotGap = compact ? 4 : 5;
@@ -397,8 +398,8 @@ function drawStatsScreen(ctx, w, h, state) {
 }
 
 function getTopControlRects(w, h, state) {
-  const { topControlSize, topControlGap, compact } = getLayoutMetrics(w, h);
-  const y = 8;
+  const { topControlSize, topControlGap, compact, topInset } = getLayoutMetrics(w, h);
+  const y = topInset;
   const fullscreen = { x: w - 10 - topControlSize, y, w: topControlSize, h: topControlSize };
   const mute = { x: fullscreen.x - topControlGap - topControlSize, y, w: topControlSize, h: topControlSize };
   const colorBlind = { x: mute.x - topControlGap - topControlSize, y, w: topControlSize, h: topControlSize };
@@ -541,7 +542,7 @@ function drawHint(ctx, _w, _h, layout, hint) {
 }
 
 function getTutorialStepConfig(state, layout) {
-  const { hudHeight, ringAreaHeight } = getLayoutMetrics(layout.gridW, layout.originY + layout.gridH);
+  const { hudHeight, ringAreaHeight, topInset } = getLayoutMetrics(layout.gridW, layout.originY + layout.gridH);
   const step = state.tutorialStep;
   if (step === 1) {
     return {
@@ -573,7 +574,7 @@ function getTutorialStepConfig(state, layout) {
       text: 'Press Q/E (or swipe) to rotate your upcoming tiles.',
       focus: {
         x: layout.originX - 22,
-        y: hudHeight + 6,
+        y: topInset + hudHeight + 6,
         w: layout.gridW + 44,
         h: ringAreaHeight - 2,
       },
@@ -584,7 +585,7 @@ function getTutorialStepConfig(state, layout) {
     text: 'Fill the score bar to clear the stage and earn stars!',
     focus: {
       x: 10,
-      y: 6,
+      y: topInset + 2,
       w: Math.max(120, layout.originX + layout.gridW + 20),
       h: hudHeight - 8,
     },
@@ -1293,18 +1294,33 @@ function drawBackground(ctx, w, h, state) {
 // --- Stage Select Screen ---
 
 function getStageButtonLayout(w, h) {
-  const compact = h < 750 || w < COMPACT_BREAKPOINT_W;
+  const header = getStageSelectHeaderLayout(w, h);
+  const compact = header.compact;
   const btnW = Math.min(STAGE_BTN_W, w - (compact ? 16 : 24));
   const btnH = compact ? 76 : STAGE_BTN_H;
   const gap = compact ? 8 : STAGE_BTN_GAP;
-  const contentTop = compact ? 60 : STAGE_HEADER_H + STAGE_CONTENT_PAD;
-  const contentBottom = h - (compact ? 2 : 6);
+  const contentTop = header.contentTop;
+  const contentBottom = h - (compact ? 8 : 10);
   const viewH = contentBottom - contentTop;
   const count = STAGES.length;
   const totalContentH = count * (btnH + gap) - gap + 16;
   const maxScroll = Math.max(0, totalContentH - viewH);
   const startX = Math.floor((w - btnW) / 2);
   return { startX, contentTop, contentBottom, viewH, btnW, btnH, gap, compact, totalContentH, maxScroll };
+}
+
+function getStageSelectHeaderLayout(w, h) {
+  const metrics = getLayoutMetrics(w, h);
+  const titleY = metrics.topInset + (metrics.compact ? 16 : 20);
+  const navY = metrics.topInset + metrics.topControlSize + (metrics.compact ? 8 : 10);
+  const nav = getNavToolbarLayout(w, navY, metrics.compact);
+  const contentTop = navY + SHOP_BTN_H + (metrics.compact ? 10 : 14);
+  return {
+    compact: metrics.compact,
+    titleY,
+    nav,
+    contentTop,
+  };
 }
 
 export function getStageSelectMaxScroll(w, h) {
@@ -1317,11 +1333,10 @@ export function getStageSelectScrollInfo(w, h) {
   return { contentTop, viewH, btnH, gap, maxScroll };
 }
 
-function getNavToolbarLayout(w) {
-  const toolbarY = 36;
+function getNavToolbarLayout(w, toolbarY, compact = false) {
   const btnH = SHOP_BTN_H;
   const gap = 6;
-  const btnW = Math.min(88, Math.max(68, Math.floor((w - 60) / 5)));
+  const btnW = Math.min(compact ? 86 : 92, Math.max(64, Math.floor((w - 58) / 5)));
   const totalW = btnW * 4 + gap * 3;
   const startX = Math.floor((w - totalW) / 2);
   return {
@@ -1333,7 +1348,8 @@ function getNavToolbarLayout(w) {
 }
 
 export function getStageButtonAt(px, py, w, h, _stages, scrollY) {
-  const nav = getNavToolbarLayout(w);
+  const header = getStageSelectHeaderLayout(w, h);
+  const nav = header.nav;
   if (inRect(px, py, nav.upgrades)) return { type: 'shop' };
   if (inRect(px, py, nav.guide)) return { type: 'guide' };
   if (inRect(px, py, nav.stats)) return { type: 'stats' };
@@ -1373,25 +1389,26 @@ function drawNavToolbarBtn(ctx, rect, label, accent) {
 
 function drawStageSelect(ctx, w, h, state) {
   const layout = getStageButtonLayout(w, h);
+  const header = getStageSelectHeaderLayout(w, h);
   const compact = layout.compact;
   const scrollY = state.stageSelectScrollY || 0;
   const frame = Number(state.frameCount || 0);
 
   // --- Fixed header ---
   ctx.fillStyle = '#f0f6ff';
-  ctx.font = `700 22px ${UI_TITLE_FONT}`;
-  ctx.textAlign = 'center';
+  ctx.font = `700 ${compact ? 20 : 24}px ${UI_TITLE_FONT}`;
+  ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
-  ctx.fillText('Choose Your Era', w / 2, 14);
+  ctx.fillText('Choose Your Era', 16, header.titleY);
 
   // Star badge
   ctx.fillStyle = STAR_COLOR;
-  ctx.font = `700 12px ${UI_FONT}`;
+  ctx.font = `700 ${compact ? 11 : 12}px ${UI_FONT}`;
   ctx.textAlign = 'left';
-  ctx.fillText(`★ ${state.totalStars || 0}`, 14, 14);
+  ctx.fillText(`★ ${state.totalStars || 0}`, 16, header.titleY + (compact ? 16 : 18));
 
   // Navigation toolbar
-  const nav = getNavToolbarLayout(w);
+  const nav = header.nav;
   drawNavToolbarBtn(ctx, nav.home, '← Home', '#a8c2d9');
   drawNavToolbarBtn(ctx, nav.guide, 'Guide', '#84bff0');
   drawNavToolbarBtn(ctx, nav.stats, 'Stats', '#c8a9ee');
@@ -1686,25 +1703,43 @@ function drawStageSelect(ctx, w, h, state) {
 
 function drawHUD(ctx, w, state) {
   const logicalH = Math.max(1, Number(ctx?.canvas?.clientHeight) || 0);
-  const { compact, hudHeight } = getLayoutMetrics(w, logicalH);
-  const hudGrad = ctx.createLinearGradient(18, 4, 18, hudHeight);
+  const { compact, hudHeight, topInset, topControlSize } = getLayoutMetrics(w, logicalH);
+  const topRects = getTopControlRects(w, logicalH, state);
+  const controlRects = [topRects.motion, topRects.colorBlind, topRects.mute, topRects.fullscreen];
+  if (topRects.pause) controlRects.unshift(topRects.pause);
+  const controlsLeft = Math.min(...controlRects.map((rect) => rect.x));
+  const contentLeft = 20;
+  const contentRight = Math.max(contentLeft + 140, controlsLeft - 10);
+  const contentW = contentRight - contentLeft;
+  const contentCenterX = contentLeft + contentW / 2;
+  const hudY = Math.max(6, topInset - 4);
+  const hudGrad = ctx.createLinearGradient(18, hudY, 18, hudY + hudHeight);
   hudGrad.addColorStop(0, 'rgba(13, 26, 42, 0.88)');
   hudGrad.addColorStop(1, 'rgba(8, 18, 30, 0.8)');
   ctx.fillStyle = hudGrad;
-  roundRect(ctx, 10, 6, w - 20, hudHeight - 8, 14);
+  roundRect(ctx, 10, hudY, w - 20, hudHeight - 4, 14);
   ctx.fill();
+  ctx.save();
+  ctx.globalAlpha = 0.18;
+  const sheen = ctx.createLinearGradient(10, hudY, 10, hudY + hudHeight * 0.5);
+  sheen.addColorStop(0, '#9fc9ee');
+  sheen.addColorStop(1, 'rgba(159, 201, 238, 0)');
+  ctx.fillStyle = sheen;
+  roundRect(ctx, 12, hudY + 2, w - 24, Math.max(16, hudHeight * 0.45), 12);
+  ctx.fill();
+  ctx.restore();
   ctx.strokeStyle = 'rgba(125, 172, 220, 0.35)';
   ctx.lineWidth = 1.2;
-  roundRect(ctx, 10, 6, w - 20, hudHeight - 8, 14);
+  roundRect(ctx, 10, hudY, w - 20, hudHeight - 4, 14);
   ctx.stroke();
 
   // Era + Stage
   const era = ERA_NAMES[state.stage] || `Stage ${state.stage}`;
   ctx.fillStyle = '#adc9e5';
   ctx.font = `600 ${compact ? 10 : 11}px ${UI_FONT}`;
-  ctx.textAlign = 'center';
+  ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
-  ctx.fillText(`— ${era} Era —`, w / 2, compact ? 14 : 18);
+  ctx.fillText(`— ${era} Era —`, contentLeft, hudY + (compact ? 10 : 14));
 
   // Score / Turn / Combo row
   const parts = [];
@@ -1738,20 +1773,23 @@ function drawHUD(ctx, w, state) {
   }
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  const statY = compact ? 26 : 34;
+  const statY = hudY + (compact ? 24 : 30);
   const statText = compact
     ? parts.filter((_, idx) => idx <= 2 || idx === parts.length - 1).join('  |  ')
     : parts.join('  |  ');
-  ctx.fillText(statText, w / 2, statY);
+  ctx.fillText(statText, contentCenterX, statY);
 
   // Target progress bar
   if (state.stageConfig) {
     const target = state.stageConfig.target;
     const progress = Math.min(1, state.score / target);
-    const barW = Math.min(280, w - 80);
+    const barW = Math.min(compact ? 240 : 280, contentW - 8);
     const barH = compact ? 7 : 8;
-    const barX = Math.floor((w - barW) / 2);
-    const barY = compact ? 32 : 58;
+    const barX = Math.floor(contentLeft + (contentW - barW) / 2);
+    const barY = Math.max(
+      hudY + (compact ? 36 : 50),
+      topInset + topControlSize + 8
+    );
 
     // Bar background
     ctx.fillStyle = 'rgba(10, 22, 36, 0.95)';
@@ -1800,7 +1838,7 @@ function drawHUD(ctx, w, state) {
       ctx.fillStyle = hazardColor;
       ctx.font = `700 ${compact ? 7 : 8}px ${UI_FONT}`;
       ctx.textAlign = 'center';
-      ctx.fillText(`⚠ Hazard in ${turnsUntilHazard}`, w / 2, barY + barH + (compact ? 5 : 6)); // Moved down and centered with turn limits
+      ctx.fillText(`⚠ Hazard in ${turnsUntilHazard}`, contentCenterX, barY + barH + (compact ? 5 : 6)); // Moved down and centered with turn limits
     }
   }
 

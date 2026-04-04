@@ -9,7 +9,7 @@ Comprehensive codebase reference for AI agents working on Realm Weave, a 7-stage
 **Name**: Realm Weave
 **Type**: Browser-based puzzle-strategy game
 **Tech Stack**: Vanilla HTML5 Canvas + JavaScript (ES modules), Vite dev server/bundler, localStorage persistence, Playwright test automation
-**Entry Point**: `src/index.html` → loads `src/main.js` (module). Fonts: 'Cinzel', 'Macondo', 'Manrope'
+**Entry Point**: `src/index.html` → loads `src/main.js` (module). Fonts: 'Cinzel', 'Macondo', 'Manrope'. Viewport uses `viewport-fit=cover` for mobile safe-area awareness.
 **Dev Server**: `npm run dev` → `http://localhost:5173`
 **Build**: `npm run build` → outputs to `dist/`
 **Deploy**: GitHub Actions auto-deploys to GitHub Pages on push to `main` → `https://arunadis.github.io/realm-wave/`
@@ -165,7 +165,7 @@ The single source of truth. All mutations go through exported functions.
 - `render(ctx, canvas)` — delegates to `renderer.js`
 - `renderGameToText()` — JSON serialization for Playwright (includes wall/cursed event fields)
 - `pixelToCell(px, py, canvasW, canvasH)` — click-to-grid mapping
-- `getGridLayout(canvasW, canvasH)` — grid geometry calculation
+- `getGridLayout(canvasW, canvasH)` — grid geometry calculation (accounts for mobile top inset + vertically centers board in remaining play area)
 
 **Persistence**: Saves to `localStorage` under key `realmWeaveProgressV1`. Includes legacy migration from `realmWeaveStars`. Saves stars/scores/upgrades plus `stats`, `completedChallenges`, and `dailyBestByDate`.
 Also persists `colorBlindMode` and `reducedMotion` preferences.
@@ -293,7 +293,7 @@ The largest file. Handles all Canvas 2D rendering and UI interaction geometry.
 
 **Layout constants**: `HUD_HEIGHT = 70`, `RING_AREA_HEIGHT = 90`, `GRID_PADDING = 20`, `CELL_GAP = 4`.
 
-**Responsive layout metrics**: `getLayoutMetrics(w, h)` adds compact-mode scaling for mobile/small canvases (reduced HUD/ring/padding/top-control sizes). `getRingLayout(w, h, state)` centralizes ring/slot sizing so draw + hit-tests stay aligned.
+**Responsive layout metrics**: `getLayoutMetrics(w, h)` adds compact-mode scaling for mobile/small canvases and provides `topInset` so HUD/top-controls/ring avoid mobile-browser clipping and overlap. `getRingLayout(w, h, state)` centralizes ring/slot sizing so draw + hit-tests stay aligned.
 
 **Main render entry**: `renderFrame(ctx, w, h, state, getGridLayout)` — dispatches to mode-specific draw functions.
 
@@ -369,8 +369,9 @@ Minimal HTML: centered `<canvas id="gameCanvas">`, Google Fonts (Cinzel serif fo
 - `COMPACT_BREAKPOINT_W` is 380px (triggers compact mode for very narrow screens, not the default 540px width).
 - All overlay panels (guide, stats, shop, pause, stage clear, game over) cap their max-width to fit within 540px.
 - Compact mode reduces HUD/ring height, ring slot size, top control size, and selected typography/button dimensions.
+- Stage Select header is split into a dedicated title row + toolbar row above the scroll region to prevent overlap with top controls.
 - Compact mode also reduces edge margins/padding for overlay panels so screens fit cleanly on phones.
-- `state.js#getGridLayout()` imports and uses `renderer.js#getLayoutMetrics()` so click/touch hitboxes match rendered compact geometry.
+- `state.js#getGridLayout()` imports and uses `renderer.js#getLayoutMetrics()` so click/touch hitboxes match rendered compact geometry while keeping grid placement centered vertically.
 - `main.js` keyboard auto-scroll for stage select uses `getStageSelectScrollInfo()` from renderer instead of hardcoded constants.
 
 ---

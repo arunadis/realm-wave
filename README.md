@@ -57,6 +57,12 @@ The optimized output is written to the `dist/` directory.
 npm run preview
 ```
 
+### Mobile Layout Behavior
+
+- The viewport uses `viewport-fit=cover` so iOS/Android safe-area insets are exposed.
+- Gameplay UI is mobile-first: top controls, HUD text, ring area, and stage-select header are spaced to avoid overlap on narrow screens.
+- The board grid is vertically centered within the available play region so space is used more evenly (reduced dead space at the bottom).
+
 ---
 
 ## Deployment
