@@ -93,6 +93,157 @@ function migrateProgressV1ToV2(progress) {
   };
 }
 
+const QUEST_POOL = [
+  {
+    id: 'merge-10',
+    metric: 'merges',
+    title: 'Forge 10 merges',
+    target: 10,
+    rewardScore: 900,
+    rewardStars: 1,
+  },
+  {
+    id: 'combo-2',
+    metric: 'bigCombos',
+    title: 'Trigger 2 big combos',
+    target: 2,
+    rewardScore: 1100,
+    rewardStars: 1,
+  },
+  {
+    id: 'tier3-3',
+    metric: 'tier3Plus',
+    title: 'Create 3 Town+ tiles',
+    target: 3,
+    rewardScore: 1200,
+    rewardStars: 1,
+  },
+  {
+    id: 'turns-10',
+    metric: 'turnsPlayed',
+    title: 'Play 10 turns',
+    target: 10,
+    rewardScore: 700,
+    rewardStars: 0,
+  },
+  {
+    id: 'hazards-3',
+    metric: 'hazardsSurvived',
+    title: 'Survive 3 hazards',
+    target: 3,
+    rewardScore: 1000,
+    rewardStars: 1,
+    needsHazards: true,
+  },
+  {
+    id: 'hold-3',
+    metric: 'holdUses',
+    title: 'Use Hold 3 times',
+    target: 3,
+    rewardScore: 650,
+    rewardStars: 0,
+    needsHold: true,
+  },
+];
+
+function createRunQuests(config, rng = Math.random) {
+  const hasHazards = !!(config && Number(config.hazardFreq) > 0);
+  const hasHold = !!(config && Array.isArray(config.mechanics) && config.mechanics.includes('hold'));
+  const pool = QUEST_POOL.filter((quest) => {
+    if (quest.needsHazards && !hasHazards) return false;
+    if (quest.needsHold && !hasHold) return false;
+    return true;
+  });
+
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    const tmp = pool[i];
+    pool[i] = pool[j];
+    pool[j] = tmp;
+  }
+
+  const questCount = Math.min(3, pool.length);
+  return pool.slice(0, questCount).map((quest) => ({
+    id: quest.id,
+    metric: quest.metric,
+    title: quest.title,
+    target: quest.target,
+    progress: 0,
+    rewardScore: quest.rewardScore,
+    rewardStars: quest.rewardStars,
+    completed: false,
+  }));
+}
+
+function applyQuestMetricProgress(metric, amount = 1) {
+  if (!Array.isArray(gameState.runQuests) || gameState.runQuests.length === 0) return;
+  const inc = Math.max(0, Math.floor(Number(amount) || 0));
+  if (inc <= 0) return;
+
+  let scoreBonus = 0;
+  let starsBonus = 0;
+  let completedCount = 0;
+
+  for (const quest of gameState.runQuests) {
+    if (!quest || quest.completed || quest.metric !== metric) continue;
+    quest.progress = Math.min(quest.target, quest.progress + inc);
+    if (quest.progress >= quest.target) {
+      quest.completed = true;
+      completedCount += 1;
+      scoreBonus += Number(quest.rewardScore) || 0;
+      starsBonus += Number(quest.rewardStars) || 0;
+    }
+  }
+
+  if (completedCount === 0) return;
+
+  if (scoreBonus > 0) {
+    gameState.score += scoreBonus;
+  }
+  if (starsBonus > 0) {
+    gameState.stars += starsBonus;
+    gameState.totalStars += starsBonus;
+    saveProgressFromState(gameState);
+  }
+
+  const rewardLabel = starsBonus > 0
+    ? `+${scoreBonus.toLocaleString()} score, +${starsBonus}★`
+    : `+${scoreBonus.toLocaleString()} score`;
+  gameState.hint = {
+    text: `Bounty complete! ${rewardLabel}`,
+    timer: 2.4,
+    duration: 2.4,
+  };
+}
+
+function awardNearMissReward(count) {
+  const hitCount = Math.max(1, Math.floor(Number(count) || 0));
+  const scoreBonus = 180 * hitCount;
+  const starsBonus = hitCount >= 2 ? 1 : 0;
+
+  gameState.score += scoreBonus;
+  if (starsBonus > 0) {
+    gameState.stars += starsBonus;
+    gameState.totalStars += starsBonus;
+    saveProgressFromState(gameState);
+  }
+
+  gameState.lastNearMissEvent = {
+    count: hitCount,
+    scoreBonus,
+    starsBonus,
+    timer: 2.6,
+    duration: 2.6,
+  };
+  gameState.hint = {
+    text: starsBonus > 0
+      ? `Near miss! +${scoreBonus} and +${starsBonus}★`
+      : `Near miss! +${scoreBonus}`,
+    timer: 2.2,
+    duration: 2.2,
+  };
+}
+
 function getGameOverTip() {
   let occupied = 0;
   let lowTierCount = 0;
@@ -318,6 +469,10 @@ function createStageSelectState() {
     placementAnim: null,
     transition: null,
     hazardFlash: null,
+    particles: [],
+    hitStop: 0,
+    runQuests: [],
+    lastNearMissEvent: null,
     hoverCell: null,
     tutorialStep: 0,
     tutorialStepTimer: 0,
@@ -415,6 +570,18 @@ function hasPollutionOnBoard(grid) {
     }
   }
   return false;
+}
+
+function countCriticalPollutionTiles(grid) {
+  let count = 0;
+  for (let r = 0; r < grid.length; r++) {
+    for (let c = 0; c < grid[r].length; c++) {
+      const tile = grid[r][c];
+      if (!tile || tile.type !== 'hazard' || tile.hazardKind !== 'pollution') continue;
+      if ((tile.turnsRemaining || 0) === 1) count += 1;
+    }
+  }
+  return count;
 }
 
 function evaluateStageChallenges(config) {
@@ -525,10 +692,14 @@ export function advanceToNextStage() {
   gameState.continueCount = 0;
   gameState.gameOverTip = null;
   gameState.challengeCounters = createChallengeCounters();
+  gameState.runQuests = createRunQuests(config, gameState.ring?.rng || Math.random);
+  gameState.lastNearMissEvent = null;
   gameState.hint = null;
   gameState.dailyChallengeActive = false;
   gameState.dailyDateKey = null;
   gameState.dailySeed = null;
+  gameState.particles = [];
+  gameState.hitStop = 0;
 
   const prevConfig = getStage(config.id - 1);
   const prevMechanics = prevConfig?.mechanics || [];
@@ -632,6 +803,8 @@ export function startStage(stageId, options = {}) {
   gameState.comboPopup = null;
   gameState.placementAnim = null;
   gameState.hazardFlash = null;
+  gameState.particles = [];
+  gameState.hitStop = 0;
   gameState.hoverCell = null;
   gameState.noMergeStreak = 0;
   gameState.continueCount = 0;
@@ -657,6 +830,8 @@ export function startStage(stageId, options = {}) {
   gameState.turnsSinceCatalyst = 0;
   gameState.lastUpgradePurchase = null;
   gameState.challengeCounters = createChallengeCounters();
+  gameState.runQuests = createRunQuests(config, ring.rng || Math.random);
+  gameState.lastNearMissEvent = null;
   gameState.dailyChallengeActive = !!options.dailyChallenge;
   gameState.dailyDateKey = options.dailyDateKey || null;
   gameState.dailySeed = options.seed ?? null;
@@ -995,6 +1170,8 @@ export function renderGameToText() {
     stats: gameState.stats,
     completedChallenges: gameState.completedChallenges,
     challengeCounters: gameState.challengeCounters,
+    runQuests: gameState.runQuests,
+    lastNearMissEvent: gameState.lastNearMissEvent,
     dailyChallengeActive: gameState.dailyChallengeActive,
     dailyDateKey: gameState.dailyDateKey,
     dailySeed: gameState.dailySeed,
@@ -1143,6 +1320,8 @@ export function handlePlacement(row, col) {
   if (!gameState.currentTile) return false;
   if (isCellFrozen(row, col)) return false; // Block placement on frozen cells
 
+  const criticalPollutionBeforeTick = countCriticalPollutionTiles(gameState.grid);
+
   const success = placeTile(gameState.grid, row, col, gameState.currentTile);
   if (!success) return false;
 
@@ -1203,6 +1382,18 @@ export function handlePlacement(row, col) {
   gameState.turnsSinceHold++;
   gameState.turnsSinceCatalyst++;
 
+  applyQuestMetricProgress('turnsPlayed', 1);
+  if (events.length > 0) {
+    applyQuestMetricProgress('merges', events.length);
+  }
+  if (events.length >= 3) {
+    applyQuestMetricProgress('bigCombos', 1);
+  }
+  const tier3PlusCreates = events.reduce((count, ev) => count + (ev.toTier >= 3 ? 1 : 0), 0);
+  if (tier3PlusCreates > 0) {
+    applyQuestMetricProgress('tier3Plus', tier3PlusCreates);
+  }
+
   maybeAdvanceTutorialAfterPlacement(events.length);
 
   // --- Stagnation penalty tracking ---
@@ -1230,6 +1421,7 @@ export function handlePlacement(row, col) {
       };
       gameState.lastHazardEvent = hazardResult;
       gameState.stats.hazardsSurvived += 1;
+      applyQuestMetricProgress('hazardsSurvived', 1);
       if (hazardResult.row != null && hazardResult.col != null) {
         gameState.hazardFlash = {
           row: hazardResult.row,
@@ -1286,6 +1478,46 @@ export function handlePlacement(row, col) {
   if (!gameState.reducedMotion && events.length >= 3) {
     gameState.screenShake = 0.35;
   }
+
+  // Hit stop & Particle generation
+  if (!gameState.reducedMotion && events.length > 0) {
+    // Generate particles for each merge
+    for (const ev of events) {
+      const tileCenter = {
+        x: (ev.col + 0.5), // we'll scale this to px in renderer
+        y: (ev.row + 0.5) 
+      };
+      
+      const particleCount = 10 + (ev.toTier * 5);
+      const color = ev.toTier >= 5 ? 'rgb(255, 215, 0)' // Gold for capital
+                  : ev.toTier >= 3 ? 'rgb(176, 196, 222)' // Steel blue for towns
+                  : 'rgb(255, 255, 255)'; // White for basic
+
+      for (let i = 0; i < particleCount; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 100 + Math.random() * 200;
+        const life = 0.3 + Math.random() * 0.4;
+        gameState.particles.push({
+          gridX: tileCenter.x,
+          gridY: tileCenter.y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          life,
+          maxLife: life,
+          color,
+          size: 3 + Math.random() * 4
+        });
+      }
+    }
+    
+    // Add hit stop for big combos or high tier merges
+    const maxTier = Math.max(...events.map(e => e.toTier));
+    if (events.length >= 3 || maxTier >= 4) {
+      gameState.hitStop = 0.15; // 150ms freeze
+    } else if (events.length === 2 || maxTier >= 3) {
+      gameState.hitStop = 0.08; // 80ms freeze
+    }
+  }
   if (gameState.challengeCounters) {
     gameState.challengeCounters.highestChain = Math.max(
       gameState.challengeCounters.highestChain,
@@ -1330,6 +1562,14 @@ export function handlePlacement(row, col) {
   gameState.lastPollutionEvent = (pollutionDestroyed.length > 0 || pollResult.expired.length > 0)
     ? { ...pollResult, destroyed: pollutionDestroyed }
     : null;
+  const nearMissCount = criticalPollutionBeforeTick > 0
+    && pollResult.expired.length > 0
+    && pollutionDestroyed.length === 0
+    ? Math.min(criticalPollutionBeforeTick, pollResult.expired.length)
+    : 0;
+  if (nearMissCount > 0) {
+    awardNearMissReward(nearMissCount);
+  }
 
   // Spawn hazard if applicable
   if (config && config.hazardFreq > 0 && gameState.turn > 0 && gameState.turn % config.hazardFreq === 0) {
@@ -1339,6 +1579,7 @@ export function handlePlacement(row, col) {
       const adjustedDestroyed = applyHazardMitigationAndSalvage(hazardResult.destroyed);
       gameState.lastHazardEvent = { ...hazardResult, destroyed: adjustedDestroyed };
       gameState.stats.hazardsSurvived += 1;
+      applyQuestMetricProgress('hazardsSurvived', 1);
       if (gameState.challengeCounters) {
         if (hazardResult.kind === 'raid') {
           gameState.challengeCounters.raidsSurvived += 1;
@@ -1349,7 +1590,10 @@ export function handlePlacement(row, col) {
       }
     } else {
       gameState.lastHazardEvent = hazardResult;
-      if (hazardResult) gameState.stats.hazardsSurvived += 1;
+      if (hazardResult) {
+        gameState.stats.hazardsSurvived += 1;
+        applyQuestMetricProgress('hazardsSurvived', 1);
+      }
     }
     if (hazardResult && hazardResult.row != null && hazardResult.col != null) {
       gameState.hazardFlash = {
@@ -1510,6 +1754,7 @@ export function handleHold() {
   if (gameState.challengeCounters) {
     gameState.challengeCounters.holdUses += 1;
   }
+  applyQuestMetricProgress('holdUses', 1);
 
   return true;
 }
@@ -1695,9 +1940,27 @@ export function handleRotate(direction) {
 }
 
 export function update(dt) {
+  // Process hit stop (freeze frame)
+  if (gameState.hitStop > 0) {
+    gameState.hitStop = Math.max(0, gameState.hitStop - dt);
+    return; // Skip updating anything else while in hit stop
+  }
+
   gameState.frameCount++;
 
   // Tick down visual effects
+  if (gameState.particles.length > 0) {
+    for (let i = gameState.particles.length - 1; i >= 0; i--) {
+      const p = gameState.particles[i];
+      p.gridX += p.vx * dt;
+      p.gridY += p.vy * dt;
+      p.life -= dt;
+      if (p.life <= 0) {
+        gameState.particles.splice(i, 1);
+      }
+    }
+  }
+
   if (gameState.screenShake > 0) {
     gameState.screenShake = Math.max(0, gameState.screenShake - dt);
   }
@@ -1743,6 +2006,12 @@ export function update(dt) {
     gameState.hint.timer -= dt;
     if (gameState.hint.timer <= 0) {
       gameState.hint = null;
+    }
+  }
+  if (gameState.lastNearMissEvent) {
+    gameState.lastNearMissEvent.timer -= dt;
+    if (gameState.lastNearMissEvent.timer <= 0) {
+      gameState.lastNearMissEvent = null;
     }
   }
   if (gameState.tutorialStep === 4 && gameState.tutorialStepTimer > 0) {

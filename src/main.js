@@ -377,11 +377,12 @@ function routePointer(px, py) {
       const ok = handleCatalystSelect(cell.row, cell.col);
       if (ok) {
         haptic(20);
-        audio.play('merge');
         const after = getState();
+        const pitchMult = 1.0 + Math.min(0.5, (after.combo || 0) * 0.1);
+        audio.play('merge', { pitchMult });
         if (after.combo >= 2) {
           haptic([15, 30, 15]);
-          audio.play('combo');
+          audio.play('combo', { pitchMult });
         }
         playEndStateAudio(beforeMode, after.mode);
       }
@@ -393,11 +394,13 @@ function routePointer(px, py) {
         audio.play('place');
         if (after.lastMergeEvents && after.lastMergeEvents.length > 0) {
           haptic(20);
-          audio.play('merge');
+          const pitchMult = 1.0 + Math.min(0.5, (after.combo || 0) * 0.1);
+          audio.play('merge', { pitchMult });
         }
         if ((after.combo || 0) >= 2) {
           haptic([15, 30, 15]);
-          audio.play('combo');
+          const pitchMult = 1.0 + Math.min(0.5, (after.combo || 0) * 0.1);
+          audio.play('combo', { pitchMult });
         }
         if (after.lastCursedEvent?.affected?.length > 0) {
           haptic([10, 20, 10]);

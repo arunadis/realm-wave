@@ -963,6 +963,23 @@ function drawGuideScreen(ctx, w, h, state) {
 
 // --- Master render ---
 
+function drawParticles(ctx, particles, layout) {
+  ctx.save();
+  for (const p of particles) {
+    const alpha = Math.max(0, p.life / p.maxLife);
+    ctx.fillStyle = p.color.replace(')', `, ${alpha})`).replace('rgb', 'rgba');
+    ctx.beginPath();
+    
+    // Calculate actual pixel position from grid coordinates
+    const px = layout.gridX + (p.gridX * layout.cellSize);
+    const py = layout.gridY + (p.gridY * layout.cellSize);
+    
+    ctx.arc(px, py, p.size * alpha, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
 export function renderFrame(ctx, w, h, state, getGridLayout) {
   accessibilityVisuals.colorBlindMode = !!state.colorBlindMode;
   // Screen shake offset
@@ -1043,6 +1060,10 @@ export function renderFrame(ctx, w, h, state, getGridLayout) {
 
   if (state.mode === 'playing' && state.hazardFlash) {
     drawHazardFlash(ctx, layout, state.hazardFlash);
+  }
+
+  if (state.particles && state.particles.length > 0) {
+    drawParticles(ctx, state.particles, layout);
   }
 
   if (state.mode === 'paused') {
@@ -1780,6 +1801,7 @@ function drawHUD(ctx, w, state) {
   ctx.fillText(statText, contentCenterX, statY);
 
   // Target progress bar
+  let questAnchorY = hudY + (compact ? 56 : 66);
   if (state.stageConfig) {
     const target = state.stageConfig.target;
     const progress = Math.min(1, state.score / target);
@@ -1840,6 +1862,50 @@ function drawHUD(ctx, w, state) {
       ctx.textAlign = 'center';
       ctx.fillText(`⚠ Hazard in ${turnsUntilHazard}`, contentCenterX, barY + barH + (compact ? 5 : 6)); // Moved down and centered with turn limits
     }
+
+    questAnchorY = barY + barH + (compact ? 14 : 18);
+  }
+
+  if (Array.isArray(state.runQuests) && state.runQuests.length > 0) {
+    const questList = state.runQuests.slice(0, compact ? 2 : 3);
+    const questLineH = compact ? 10 : 12;
+    const hasNearMiss = !!state.lastNearMissEvent;
+    const questPanelW = Math.min(contentW, compact ? 260 : 320);
+    const questPanelX = Math.floor(contentCenterX - questPanelW / 2);
+    const questPanelH = 8 + (questList.length * questLineH) + (hasNearMiss ? questLineH : 0);
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(9, 19, 31, 0.72)';
+    roundRect(ctx, questPanelX, questAnchorY, questPanelW, questPanelH, 8);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(142, 186, 230, 0.28)';
+    ctx.lineWidth = 1;
+    roundRect(ctx, questPanelX, questAnchorY, questPanelW, questPanelH, 8);
+    ctx.stroke();
+
+    let lineY = questAnchorY + 5;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    for (const quest of questList) {
+      const done = !!quest.completed;
+      const marker = done ? '✓' : '○';
+      const label = `${marker} ${quest.title} ${quest.progress}/${quest.target}`;
+      ctx.fillStyle = done ? '#8edfa6' : '#d4e5f6';
+      ctx.font = `${done ? '700' : '600'} ${compact ? 7 : 8}px ${UI_FONT}`;
+      ctx.fillText(label, questPanelX + 8, lineY);
+      lineY += questLineH;
+    }
+
+    if (hasNearMiss) {
+      const ev = state.lastNearMissEvent;
+      const nearMissText = ev.starsBonus > 0
+        ? `Near miss +${ev.scoreBonus} +${ev.starsBonus}★`
+        : `Near miss +${ev.scoreBonus}`;
+      ctx.fillStyle = '#f8cf85';
+      ctx.font = `700 ${compact ? 7 : 8}px ${UI_FONT}`;
+      ctx.fillText(nearMissText, questPanelX + 8, lineY);
+    }
+    ctx.restore();
   }
 
   drawTopControls(ctx, w, logicalH, state);
@@ -2127,15 +2193,25 @@ function drawGrid(ctx, layout, state) {
           && state.placementAnim.row === r
           && state.placementAnim.col === c
           && state.placementAnim.timer > 0;
+        const mergeAnim = !isPlacementAnim && state.mergeFlashes
+          ? state.mergeFlashes.find((flash) => (
+            flash.row === r
+            && flash.col === c
+            && flash.timer > 0
+            && flash.chainIndex >= 1
+          ))
+          : null;
         if (isHazardTile(tile)) {
           if (isPlacementAnim) {
-            drawPlacementAnimatedTile(ctx, x, y, s, tile, state.placementAnim);
+            drawPlacementAnimatedTile(ctx, x, y, s, tile, state.placementAnim, state);
           } else {
             drawHazardTile(ctx, x, y, s, tile);
           }
         } else {
           if (isPlacementAnim) {
-            drawPlacementAnimatedTile(ctx, x, y, s, tile, state.placementAnim);
+            drawPlacementAnimatedTile(ctx, x, y, s, tile, state.placementAnim, state);
+          } else if (mergeAnim && !state.reducedMotion) {
+            drawMergeAnimatedTile(ctx, x, y, s, tile, mergeAnim, state);
           } else {
             drawTile(ctx, x, y, s, tile, state);
           }
@@ -2232,12 +2308,30 @@ function easeOutQuad(t) {
 function drawPlacementAnimatedTile(ctx, x, y, s, tile, anim) {
   const progress = 1 - (anim.timer / anim.duration);
   const eased = easeOutQuad(progress);
-  const scale = 0.5 + 0.5 * eased;
+  const base = 0.68 + 0.32 * eased;
+  const squish = Math.sin(progress * Math.PI) * 0.18;
+  const scaleX = base + squish;
+  const scaleY = base - squish * 0.6;
   ctx.save();
   ctx.translate(x + s / 2, y + s / 2);
-  ctx.scale(scale, scale);
+  ctx.scale(scaleX, scaleY);
   ctx.globalAlpha = eased;
   drawTile(ctx, -s / 2, -s / 2, s, tile);
+  ctx.restore();
+}
+
+function drawMergeAnimatedTile(ctx, x, y, s, tile, anim, state) {
+  const progress = 1 - (anim.timer / anim.duration);
+  const strength = Math.min(0.28, 0.14 + (anim.chainIndex || 1) * 0.03);
+  const squash = Math.sin(progress * Math.PI) * strength;
+  const pulse = 1 + Math.sin(progress * Math.PI * 2.1) * 0.06;
+  const scaleX = (1 + squash) * pulse;
+  const scaleY = (1 - squash * 0.65) * pulse;
+
+  ctx.save();
+  ctx.translate(x + s / 2, y + s / 2);
+  ctx.scale(scaleX, scaleY);
+  drawTile(ctx, -s / 2, -s / 2, s, tile, state);
   ctx.restore();
 }
 

@@ -52,21 +52,23 @@ export function createAudioManager() {
     osc.stop(at + duration + 0.02);
   }
 
-  function play(name) {
+  function play(name, options = {}) {
     if (muted) return;
     const audioCtx = ensureContext();
     if (!audioCtx) return;
     const now = audioCtx.currentTime;
 
+    const pitchMult = options.pitchMult || 1.0;
+
     if (name === 'place') {
-      scheduleTone(audioCtx, now, 280, 0.08, 0.05, 'triangle');
+      scheduleTone(audioCtx, now, 280 * pitchMult, 0.08, 0.05, 'triangle');
     } else if (name === 'merge') {
-      scheduleTone(audioCtx, now, 360, 0.09, 0.07, 'triangle');
-      scheduleTone(audioCtx, now + 0.07, 520, 0.11, 0.06, 'triangle');
+      scheduleTone(audioCtx, now, 360 * pitchMult, 0.09, 0.07, 'triangle');
+      scheduleTone(audioCtx, now + 0.07, 520 * pitchMult, 0.11, 0.06, 'triangle');
     } else if (name === 'combo') {
-      scheduleTone(audioCtx, now, 420, 0.08, 0.07, 'square');
-      scheduleTone(audioCtx, now + 0.06, 560, 0.09, 0.06, 'square');
-      scheduleTone(audioCtx, now + 0.12, 700, 0.1, 0.05, 'square');
+      scheduleTone(audioCtx, now, 420 * pitchMult, 0.08, 0.07, 'square');
+      scheduleTone(audioCtx, now + 0.06, 560 * pitchMult, 0.09, 0.06, 'square');
+      scheduleTone(audioCtx, now + 0.12, 700 * pitchMult, 0.1, 0.05, 'square');
     } else if (name === 'hazard') {
       scheduleTone(audioCtx, now, 160, 0.16, 0.08, 'sawtooth');
     } else if (name === 'earthquake') {
